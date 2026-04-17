@@ -1,50 +1,65 @@
 import { BottomNav } from '@/components/BottomNav';
-import { useRouter } from 'expo-router';
-import {
-  Bell,
-  ChevronRight,
-  Heart,
-  MessageCircle,
-  User,
-  Users,
-} from 'lucide-react-native';
+import { TopicCard } from '@/components/TopicCard';
+import { Bell, Briefcase, Heart, MessageSquare, Moon, Sparkles, Users } from 'lucide-react-native';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const CATEGORIES = [
+const TOPICS = [
   {
+    topic: 'mental-health',
     title: 'Mental Health',
-    description: 'Talk about anxiety, depression, stress and more',
+    description: 'Anxiety, depression, stress and beyond',
+    listeners: 24,
     Icon: Heart,
-    iconColor: '#6366f1',
-    bgFrom: 'rgba(99,102,241,0.3)',
-    bgTo: 'rgba(99,102,241,0.1)',
-    available: 24,
   },
   {
+    topic: 'relationships',
     title: 'Relationships',
-    description: 'Family, friends, dating and personal connections',
+    description: 'Family, friends, dating and connection',
+    listeners: 18,
     Icon: Users,
-    iconColor: '#4f4f7a',
-    bgFrom: 'rgba(79,79,122,0.3)',
-    bgTo: 'rgba(79,79,122,0.1)',
-    available: 18,
   },
   {
+    topic: 'general-advice',
     title: 'General Advice',
-    description: 'Life decisions, career, and everyday challenges',
-    Icon: MessageCircle,
-    iconColor: '#38b2ac',
-    bgFrom: 'rgba(56,178,172,0.3)',
-    bgTo: 'rgba(56,178,172,0.1)',
-    available: 31,
+    description: 'Life decisions and everyday challenges',
+    listeners: 31,
+    Icon: MessageSquare,
+  },
+  {
+    topic: 'work-career',
+    title: 'Work & Career',
+    description: 'Burnout, growth, and finding direction',
+    listeners: 12,
+    Icon: Briefcase,
+  },
+  {
+    topic: 'sleep-rest',
+    title: 'Sleep & Rest',
+    description: 'Late-night thoughts and wind-down talks',
+    listeners: 9,
+    Icon: Moon,
   },
 ] as const;
 
+const MOODS = [
+  { e: '🌿', l: 'Calm' },
+  { e: '🌧️', l: 'Low' },
+  { e: '😰', l: 'Anxious' },
+  { e: '🔥', l: 'Angry' },
+  { e: '✨', l: 'Hopeful' },
+  { e: '😴', l: 'Tired' },
+];
+
+function getToday() {
+  const d = new Date();
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+}
 
 export default function HomeScreen() {
-  const router = useRouter();
-
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView
@@ -53,74 +68,96 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <View className="px-5 pt-4 pb-6">
-          <View className="flex-row items-center justify-between mb-6">
-            <View>
-              <Text className="text-muted-foreground text-sm">Welcome back</Text>
-              <Text className="text-2xl font-semibold text-foreground">Talkd</Text>
-            </View>
-            <View className="flex-row items-center gap-3">
-              <TouchableOpacity className="w-10 h-10 rounded-full bg-secondary items-center justify-center">
-                <Bell size={20} color="#9898aa" />
-              </TouchableOpacity>
-              <TouchableOpacity className="w-10 h-10 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(99,102,241,0.2)' }}>
-                <User size={20} color="#6366f1" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Greeting card */}
-          <View
-            className="rounded-2xl p-4 border"
-            style={{
-              backgroundColor: 'rgba(99,102,241,0.12)',
-              borderColor: 'rgba(99,102,241,0.2)',
-            }}
-          >
-            <Text className="text-foreground font-medium mb-1">You're not alone</Text>
-            <Text className="text-muted-foreground text-sm leading-relaxed">
-              Connect anonymously with someone who understands
+        <View className="px-5 pt-12 pb-5 flex-row items-start justify-between">
+          <View>
+            <Text style={{ fontSize: 12, letterSpacing: 1.4, color: '#9090aa', fontWeight: '500', textTransform: 'uppercase' }}>
+              {getToday()}
             </Text>
+            <Text style={{ fontFamily: 'Georgia', fontSize: 34, lineHeight: 38, fontWeight: '600', color: '#eeeef5', marginTop: 4 }}>
+              {'Good to see\nyou again.'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            className="h-10 w-10 rounded-full bg-surface border border-border items-center justify-center"
+            style={{ marginTop: 4 }}
+          >
+            <Bell size={18} color="rgba(238,238,245,0.7)" strokeWidth={1.8} />
+            <View className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-primary" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Hero CTA */}
+        <View className="px-5">
+          <TouchableOpacity
+            className="rounded-2xl p-5 overflow-hidden"
+            style={{ backgroundColor: '#6366f1' }}
+            activeOpacity={0.85}
+          >
+            <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full self-start mb-3"
+              style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
+              <Sparkles size={12} color="#fff" />
+              <Text style={{ fontSize: 11, fontWeight: '500', color: '#fff' }}>Available now</Text>
+            </View>
+            <Text style={{ fontFamily: 'Georgia', fontSize: 24, fontWeight: '600', color: '#fff', lineHeight: 30 }}>
+              Start a quiet conversation
+            </Text>
+            <Text style={{ marginTop: 6, fontSize: 13.5, color: 'rgba(255,255,255,0.75)', lineHeight: 20, maxWidth: 280 }}>
+              Connect anonymously with someone who'll really listen. No judgement, no records.
+            </Text>
+            <View className="mt-4 flex-row items-center gap-2">
+              <Text style={{ fontSize: 13, fontWeight: '500', color: '#fff' }}>Begin now</Text>
+              <View className="h-6 w-6 rounded-full items-center justify-center"
+                style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
+                <Text style={{ color: '#fff', fontSize: 14 }}>→</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Mood check-in */}
+        <View className="mt-7">
+          <Text style={{ fontFamily: 'Georgia', fontSize: 15, fontWeight: '600', color: '#eeeef5', marginBottom: 10, paddingHorizontal: 20 }}>
+            How are you feeling?
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
+          >
+            {MOODS.map((m) => (
+              <TouchableOpacity
+                key={m.l}
+                className="flex-row items-center gap-2 px-3.5 py-2 rounded-xl bg-surface border border-border"
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 16 }}>{m.e}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '500', color: '#eeeef5' }}>{m.l}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Topics */}
+        <View className="px-5 mt-7">
+          <View className="flex-row items-baseline justify-between mb-3">
+            <Text style={{ fontFamily: 'Georgia', fontSize: 15, fontWeight: '600', color: '#eeeef5' }}>
+              Topics
+            </Text>
+            <Text style={{ fontSize: 12, color: '#9090aa' }}>{TOPICS.length} available</Text>
+          </View>
+          <View className="gap-2.5">
+            {TOPICS.map((t) => (
+              <TopicCard key={t.topic} {...t} />
+            ))}
           </View>
         </View>
 
-        {/* Categories */}
-        <View className="px-5 flex-1">
-          <Text className="text-lg font-medium text-foreground mb-4">Choose a topic</Text>
-
-          <View className="gap-3">
-            {CATEGORIES.map((category) => (
-              <TouchableOpacity
-                key={category.title}
-                className="w-full bg-card rounded-2xl p-4 border border-border"
-                onPress={() => router.push('/chat')}
-                activeOpacity={0.7}
-              >
-                <View className="flex-row items-start gap-4">
-                  <View
-                    className="w-12 h-12 rounded-xl items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: category.bgFrom }}
-                  >
-                    <category.Icon size={24} color={category.iconColor} />
-                  </View>
-                  <View className="flex-1">
-                    <View className="flex-row items-center justify-between mb-1">
-                      <Text className="font-medium text-foreground">{category.title}</Text>
-                      <ChevronRight size={20} color="#9898aa" />
-                    </View>
-                    <Text className="text-sm text-muted-foreground leading-relaxed mb-2">
-                      {category.description}
-                    </Text>
-                    <View className="flex-row items-center gap-1.5">
-                      <View className="w-2 h-2 rounded-full bg-green-500" />
-                      <Text className="text-xs text-muted-foreground">
-                        {category.available} listeners online
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+        {/* Reassurance footer */}
+        <View className="px-5 mt-8 mb-2">
+          <View className="rounded-xl bg-elevated border border-border p-4">
+            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 14, color: 'rgba(238,238,245,0.8)', textAlign: 'center', lineHeight: 22 }}>
+              "You don't have to carry it alone."
+            </Text>
           </View>
         </View>
       </ScrollView>

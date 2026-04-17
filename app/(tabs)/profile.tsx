@@ -6,168 +6,160 @@ import {
   Clock,
   HelpCircle,
   LogOut,
-  MessageCircle,
+  MessageSquare,
   Moon,
-  Settings,
+  MessageCircle,
   Shield,
   Star,
   User,
 } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type MenuItem = {
-  icon: typeof Bell;
-  label: string;
-  value?: string;
-  danger?: boolean;
-};
+type MenuItem = { icon: LucideIcon; label: string; value?: string; destructive?: boolean };
+type MenuSection = { section: string; items: MenuItem[] };
 
-type MenuSection = {
-  section: string;
-  items: MenuItem[];
-};
-
-const MENU_ITEMS: MenuSection[] = [
+const MENU: MenuSection[] = [
   {
     section: 'Preferences',
     items: [
       { icon: Bell, label: 'Notifications', value: 'On' },
-      { icon: Moon, label: 'Dark Mode', value: 'On' },
-      { icon: Shield, label: 'Privacy' },
+      { icon: Moon, label: 'Appearance', value: 'Auto' },
+      { icon: Shield, label: 'Privacy & data' },
     ],
   },
   {
     section: 'Support',
     items: [
-      { icon: HelpCircle, label: 'Help Center' },
-      { icon: MessageCircle, label: 'Become a Listener' },
-    ],
-  },
-  {
-    section: 'Account',
-    items: [
-      { icon: Settings, label: 'Account Settings' },
-      { icon: LogOut, label: 'Sign Out', danger: true },
+      { icon: HelpCircle, label: 'Help center' },
+      { icon: MessageSquare, label: 'Become a listener' },
     ],
   },
 ];
 
+function Row({ icon: Icon, label, value, destructive = false }: MenuItem) {
+  return (
+    <TouchableOpacity className="flex-row items-center gap-3 px-4 py-3.5" activeOpacity={0.7}>
+      <View
+        className="h-8 w-8 rounded-lg items-center justify-center"
+        style={{ backgroundColor: destructive ? 'rgba(239,68,68,0.1)' : '#2d2d4a' }}
+      >
+        <Icon size={16} color={destructive ? '#ef4444' : 'rgba(238,238,245,0.7)'} strokeWidth={2} />
+      </View>
+      <Text
+        className="flex-1 text-left"
+        style={{ fontSize: 14.5, fontWeight: '500', color: destructive ? '#ef4444' : '#eeeef5' }}
+      >
+        {label}
+      </Text>
+      {value ? <Text style={{ fontSize: 13, color: '#9090aa' }}>{value}</Text> : null}
+      <ChevronRight size={16} color="rgba(144,144,170,0.6)" />
+    </TouchableOpacity>
+  );
+}
+
 export default function ProfileScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView
-        className="flex-1"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 8 }}
-      >
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+
         {/* Header */}
-        <View className="px-5 pt-4 pb-6">
-          <Text className="text-2xl font-semibold text-foreground mb-6">Profile</Text>
+        <View className="px-5 pt-12 pb-5">
+          <Text style={{ fontSize: 12, letterSpacing: 1.4, color: '#9090aa', fontWeight: '500', textTransform: 'uppercase' }}>
+            Account
+          </Text>
+          <Text style={{ fontFamily: 'Georgia', fontSize: 34, lineHeight: 38, fontWeight: '600', color: '#eeeef5', marginTop: 4 }}>
+            Profile
+          </Text>
+        </View>
 
-          {/* Profile card */}
-          <View className="bg-card rounded-2xl p-5 border border-border">
-            <View className="flex-row items-center gap-4 mb-5">
-              <View
-                className="w-16 h-16 rounded-full items-center justify-center"
-                style={{
-                  backgroundColor: 'rgba(99,102,241,0.15)',
-                  borderWidth: 2,
-                  borderColor: 'rgba(99,102,241,0.3)',
-                }}
-              >
-                <User size={32} color="#6366f1" />
-              </View>
-              <View>
-                <Text className="text-lg font-semibold text-foreground">Anonymous User</Text>
-                <Text className="text-sm text-muted-foreground">Member since March 2024</Text>
-              </View>
+        {/* Identity card */}
+        <View className="px-5">
+          <View className="rounded-2xl bg-surface border border-border p-5 items-center">
+            <View
+              className="h-20 w-20 rounded-full items-center justify-center"
+              style={{ backgroundColor: '#21213e', borderWidth: 1, borderColor: 'rgba(99,102,241,0.15)' }}
+            >
+              <User size={36} color="#6366f1" strokeWidth={1.6} />
             </View>
+            <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: '#eeeef5', marginTop: 12 }}>
+              Anonymous User
+            </Text>
+            <Text style={{ fontSize: 12.5, color: '#9090aa', marginTop: 2 }}>Member since March 2024</Text>
 
-            {/* Stats */}
-            <View className="flex-row gap-3">
+            <View className="mt-5 flex-row w-full">
               {[
-                { Icon: MessageCircle, iconColor: '#6366f1', value: '12', label: 'Chats' },
-                { Icon: Clock, iconColor: '#4f4f7a', value: '5h', label: 'Time' },
-                { Icon: Star, iconColor: '#38b2ac', value: '4.2', label: 'Rating' },
-              ].map(({ Icon, iconColor, value, label }) => (
+                { Icon: MessageCircle, value: '12', label: 'Chats' },
+                { Icon: Clock, value: '5h', label: 'Listened' },
+                { Icon: Star, value: '4.2', label: 'Rating' },
+              ].map(({ Icon, value, label }, i) => (
                 <View
                   key={label}
-                  className="flex-1 rounded-xl p-3 items-center"
-                  style={{ backgroundColor: 'rgba(45,45,69,0.5)' }}
+                  className="flex-1 items-center"
+                  style={i > 0 ? { borderLeftWidth: 1, borderLeftColor: '#2e2e4a' } : undefined}
                 >
-                  <View className="flex-row items-center gap-1 mb-1">
-                    <Icon size={16} color={iconColor} />
-                    <Text className="text-lg font-semibold text-foreground">{value}</Text>
-                  </View>
-                  <Text className="text-xs text-muted-foreground">{label}</Text>
+                  <Icon size={14} color="#6366f1" style={{ marginBottom: 6 }} />
+                  <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: '#eeeef5', lineHeight: 22 }}>
+                    {value}
+                  </Text>
+                  <Text style={{ marginTop: 4, fontSize: 11, color: '#9090aa' }}>{label}</Text>
                 </View>
               ))}
             </View>
           </View>
+        </View>
 
-          {/* Achievement badge */}
-          <View
-            className="mt-4 rounded-2xl p-4 border"
-            style={{
-              backgroundColor: 'rgba(99,102,241,0.12)',
-              borderColor: 'rgba(99,102,241,0.2)',
-            }}
+        {/* Badge */}
+        <View className="px-5 mt-4">
+          <TouchableOpacity
+            className="rounded-xl p-4 flex-row items-center gap-3"
+            style={{ backgroundColor: '#6366f1' }}
+            activeOpacity={0.85}
           >
-            <View className="flex-row items-center gap-3">
-              <View
-                className="w-10 h-10 rounded-xl items-center justify-center"
-                style={{ backgroundColor: 'rgba(99,102,241,0.2)' }}
-              >
-                <Award size={20} color="#6366f1" />
-              </View>
-              <View>
-                <Text className="text-foreground font-medium text-sm">First Steps Badge</Text>
-                <Text className="text-muted-foreground text-xs">Completed 10+ sessions</Text>
-              </View>
+            <View
+              className="h-11 w-11 rounded-xl items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+            >
+              <Award size={20} color="#fff" />
             </View>
-          </View>
+            <View className="flex-1">
+              <Text style={{ fontFamily: 'Georgia', fontSize: 16, fontWeight: '600', color: '#fff', lineHeight: 20 }}>
+                First Steps
+              </Text>
+              <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.75)' }}>Completed 10+ sessions</Text>
+            </View>
+            <ChevronRight size={16} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
         </View>
 
         {/* Menu sections */}
-        <View className="px-5 pb-4">
-          {MENU_ITEMS.map((section) => (
-            <View key={section.section} className="mb-4">
-              <Text className="text-xs text-muted-foreground uppercase mb-2 px-1" style={{ letterSpacing: 1 }}>
-                {section.section}
-              </Text>
-              <View className="bg-card rounded-2xl border border-border overflow-hidden">
-                {section.items.map((item, index) => (
-                  <TouchableOpacity
-                    key={item.label}
-                    className="flex-row items-center justify-between p-4"
-                    style={
-                      index !== section.items.length - 1
-                        ? { borderBottomWidth: 1, borderBottomColor: 'rgba(58,58,85,0.3)' }
-                        : undefined
-                    }
-                    activeOpacity={0.7}
-                  >
-                    <View className="flex-row items-center gap-3">
-                      <item.icon size={20} color={item.danger ? '#ef4444' : '#9898aa'} />
-                      <Text
-                        className="text-sm"
-                        style={{ color: item.danger ? '#ef4444' : '#f2f2f5' }}
-                      >
-                        {item.label}
-                      </Text>
-                    </View>
-                    <View className="flex-row items-center gap-2">
-                      {item.value ? (
-                        <Text className="text-xs text-muted-foreground">{item.value}</Text>
-                      ) : null}
-                      <ChevronRight size={16} color="#9898aa" />
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
+        {MENU.map((section) => (
+          <View key={section.section} className="px-5 mt-7">
+            <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 1.4, color: '#9090aa', textTransform: 'uppercase', marginBottom: 8, paddingHorizontal: 4 }}>
+              {section.section}
+            </Text>
+            <View className="rounded-xl bg-surface border border-border overflow-hidden">
+              {section.items.map((item, i) => (
+                <View
+                  key={item.label}
+                  style={i < section.items.length - 1 ? { borderBottomWidth: 1, borderBottomColor: '#2e2e4a' } : undefined}
+                >
+                  <Row {...item} />
+                </View>
+              ))}
             </View>
-          ))}
+          </View>
+        ))}
+
+        {/* Sign out */}
+        <View className="px-5 mt-5">
+          <View className="rounded-xl bg-surface border border-border overflow-hidden">
+            <Row icon={LogOut} label="Sign out" destructive />
+          </View>
+          <Text style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: '#9090aa' }}>
+            Talkd · v1.0.0
+          </Text>
         </View>
       </ScrollView>
 

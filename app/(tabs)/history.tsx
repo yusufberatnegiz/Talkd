@@ -1,143 +1,113 @@
 import { BottomNav } from '@/components/BottomNav';
-import {
-  ChevronRight,
-  Clock,
-  Heart,
-  MessageCircle,
-  Star,
-  Users,
-} from 'lucide-react-native';
+import { Clock, Heart, MessageSquare, Star, TrendingUp, Users } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const CHAT_HISTORY = [
-  {
-    id: 1,
-    category: 'Mental Health',
-    Icon: Heart,
-    iconColor: '#6366f1',
-    date: 'Today',
-    duration: '24 min',
-    rating: 5,
-    preview: 'Thank you for listening. I feel much better now...',
-  },
-  {
-    id: 2,
-    category: 'Relationships',
-    Icon: Users,
-    iconColor: '#4f4f7a',
-    date: 'Yesterday',
-    duration: '18 min',
-    rating: 4,
-    preview: 'It was helpful to talk about my situation with...',
-  },
-  {
-    id: 3,
-    category: 'General Advice',
-    Icon: MessageCircle,
-    iconColor: '#38b2ac',
-    date: 'Mar 15',
-    duration: '32 min',
-    rating: 5,
-    preview: 'Great advice on my career decision. Really helped...',
-  },
-  {
-    id: 4,
-    category: 'Mental Health',
-    Icon: Heart,
-    iconColor: '#6366f1',
-    date: 'Mar 12',
-    duration: '15 min',
-    rating: 3,
-    preview: 'The session was okay but felt a bit rushed...',
-  },
-  {
-    id: 5,
-    category: 'Relationships',
-    Icon: Users,
-    iconColor: '#4f4f7a',
-    date: 'Mar 10',
-    duration: '28 min',
-    rating: 5,
-    preview: 'Such a supportive listener. Helped me see things...',
-  },
+const iconMap: Record<string, LucideIcon> = {
+  'Mental Health': Heart,
+  'Relationships': Users,
+  'General Advice': MessageSquare,
+};
+
+const SESSIONS = [
+  { topic: 'Mental Health', preview: 'Thank you for listening. I feel much better now.', when: 'Today', duration: '24 min', rating: 5 },
+  { topic: 'Relationships', preview: 'It was helpful to talk about my situation with someone who got it.', when: 'Yesterday', duration: '18 min', rating: 4 },
+  { topic: 'General Advice', preview: 'Great advice on my career decision. Really helped me think clearly.', when: 'Mar 15', duration: '32 min', rating: 5 },
+  { topic: 'Mental Health', preview: 'The session was okay but felt a bit rushed.', when: 'Mar 12', duration: '15 min', rating: 3 },
+  { topic: 'Relationships', preview: 'Such a supportive listener. Helped me see things from a new angle.', when: 'Mar 10', duration: '28 min', rating: 5 },
 ] as const;
 
 export default function HistoryScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
-      {/* Header */}
-      <View className="px-5 pt-4 pb-4">
-        <Text className="text-2xl font-semibold text-foreground mb-1">History</Text>
-        <Text className="text-muted-foreground text-sm">Your past conversations</Text>
-      </View>
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
 
-      {/* Stats summary */}
-      <View className="px-5 pb-4">
-        <View className="flex-row gap-3">
-          {[
-            { value: '12', label: 'Sessions' },
-            { value: '4.2', label: 'Avg Rating' },
-            { value: '5h', label: 'Total Time' },
-          ].map(({ value, label }) => (
-            <View
-              key={label}
-              className="flex-1 bg-card rounded-xl p-3 border border-border items-center"
-            >
-              <Text className="text-xl font-semibold text-foreground">{value}</Text>
-              <Text className="text-xs text-muted-foreground">{label}</Text>
-            </View>
-          ))}
+        {/* Header */}
+        <View className="px-5 pt-12 pb-5">
+          <Text style={{ fontSize: 12, letterSpacing: 1.4, color: '#9090aa', fontWeight: '500', textTransform: 'uppercase' }}>
+            Your journey
+          </Text>
+          <Text style={{ fontFamily: 'Georgia', fontSize: 34, lineHeight: 38, fontWeight: '600', color: '#eeeef5', marginTop: 4 }}>
+            History
+          </Text>
         </View>
-      </View>
 
-      {/* List */}
-      <ScrollView
-        className="flex-1 px-5"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ gap: 12, paddingBottom: 8 }}
-      >
-        {CHAT_HISTORY.map((chat) => (
-          <TouchableOpacity
-            key={chat.id}
-            className="w-full bg-card rounded-2xl p-4 border border-border"
-            activeOpacity={0.7}
-          >
-            <View className="flex-row items-start gap-3">
-              <View className="w-10 h-10 rounded-xl bg-secondary items-center justify-center flex-shrink-0">
-                <chat.Icon size={20} color={chat.iconColor} />
-              </View>
-              <View className="flex-1">
-                <View className="flex-row items-center justify-between mb-1">
-                  <Text className="font-medium text-foreground text-sm">{chat.category}</Text>
-                  <ChevronRight size={16} color="#9898aa" />
+        {/* Summary card */}
+        <View className="px-5">
+          <View className="rounded-2xl bg-surface border border-border p-5">
+            <View className="flex-row items-center gap-2 mb-3">
+              <TrendingUp size={14} color="#6366f1" />
+              <Text style={{ fontSize: 12, color: '#9090aa' }}>Last 30 days</Text>
+            </View>
+            <View className="flex-row">
+              {[{ v: '12', l: 'Sessions' }, { v: '4.2', l: 'Avg rating' }, { v: '5h', l: 'Total time' }].map((s, i) => (
+                <View
+                  key={s.l}
+                  className="flex-1 items-center"
+                  style={i > 0 ? { borderLeftWidth: 1, borderLeftColor: '#2e2e4a' } : undefined}
+                >
+                  <Text style={{ fontFamily: 'Georgia', fontSize: 26, fontWeight: '600', color: '#eeeef5', lineHeight: 30 }}>
+                    {s.v}
+                  </Text>
+                  <Text style={{ marginTop: 6, fontSize: 11.5, color: '#9090aa' }}>{s.l}</Text>
                 </View>
-                <Text className="text-xs text-muted-foreground mb-2" numberOfLines={1}>
-                  {chat.preview}
-                </Text>
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center gap-3">
-                    <Text className="text-xs text-muted-foreground">{chat.date}</Text>
-                    <View className="flex-row items-center gap-1">
-                      <Clock size={12} color="#9898aa" />
-                      <Text className="text-xs text-muted-foreground">{chat.duration}</Text>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Sessions list */}
+        <View className="px-5 mt-7">
+          <Text style={{ fontFamily: 'Georgia', fontSize: 15, fontWeight: '600', color: '#eeeef5', marginBottom: 12 }}>
+            Conversations
+          </Text>
+          <View className="rounded-xl bg-surface border border-border overflow-hidden">
+            {SESSIONS.map((s, i) => {
+              const Icon = iconMap[s.topic] ?? MessageSquare;
+              return (
+                <TouchableOpacity
+                  key={i}
+                  className="p-4"
+                  style={i < SESSIONS.length - 1 ? { borderBottomWidth: 1, borderBottomColor: '#2e2e4a' } : undefined}
+                  activeOpacity={0.7}
+                >
+                  <View className="flex-row items-start gap-3">
+                    <View className="h-10 w-10 rounded-xl bg-primary-soft items-center justify-center flex-shrink-0">
+                      <Icon size={18} color="#6366f1" strokeWidth={2} />
+                    </View>
+                    <View className="flex-1">
+                      <View className="flex-row items-center justify-between gap-2 mb-1">
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: '#eeeef5' }}>{s.topic}</Text>
+                        <View className="flex-row items-center">
+                          {Array.from({ length: 5 }).map((_, idx) => (
+                            <Star
+                              key={idx}
+                              size={12}
+                              color={idx < s.rating ? '#6366f1' : 'rgba(144,144,170,0.3)'}
+                              fill={idx < s.rating ? '#6366f1' : 'transparent'}
+                            />
+                          ))}
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 13.5, color: '#9090aa', lineHeight: 20 }} numberOfLines={2}>
+                        {s.preview}
+                      </Text>
+                      <View className="mt-2.5 flex-row items-center gap-3">
+                        <Text style={{ fontSize: 11.5, color: '#9090aa' }}>{s.when}</Text>
+                        <View className="w-0.5 h-0.5 rounded-full bg-muted-foreground" />
+                        <View className="flex-row items-center gap-1">
+                          <Clock size={12} color="#9090aa" />
+                          <Text style={{ fontSize: 11.5, color: '#9090aa' }}>{s.duration}</Text>
+                        </View>
+                      </View>
                     </View>
                   </View>
-                  <View className="flex-row items-center">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        size={12}
-                        color={i < chat.rating ? '#6366f1' : 'rgba(152,152,170,0.3)'}
-                        fill={i < chat.rating ? '#6366f1' : 'transparent'}
-                      />
-                    ))}
-                  </View>
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
       </ScrollView>
 
       <BottomNav active="History" />

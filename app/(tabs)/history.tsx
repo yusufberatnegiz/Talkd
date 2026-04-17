@@ -12,11 +12,11 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 const SESSIONS = [
-  { topic: 'Mental Health', preview: 'Thank you for listening. I feel much better now.', when: 'Today', duration: '24 min', rating: 5 },
-  { topic: 'Relationships', preview: 'It was helpful to talk about my situation with someone who got it.', when: 'Yesterday', duration: '18 min', rating: 4 },
-  { topic: 'General Advice', preview: 'Great advice on my career decision. Really helped me think clearly.', when: 'Mar 15', duration: '32 min', rating: 5 },
-  { topic: 'Mental Health', preview: 'The session was okay but felt a bit rushed.', when: 'Mar 12', duration: '15 min', rating: 3 },
-  { topic: 'Relationships', preview: 'Such a supportive listener. Helped me see things from a new angle.', when: 'Mar 10', duration: '28 min', rating: 5 },
+  { topic: 'Mental Health', when: 'Today', duration: '24 min', rating: 5 },
+  { topic: 'Relationships', when: 'Yesterday', duration: '18 min', rating: 4 },
+  { topic: 'General Advice', when: 'Mar 15', duration: '32 min', rating: 5 },
+  { topic: 'Mental Health', when: 'Mar 12', duration: '15 min', rating: 3 },
+  { topic: 'Relationships', when: 'Mar 10', duration: '28 min', rating: 5 },
 ] as const;
 
 export default function HistoryScreen() {
@@ -93,10 +93,7 @@ export default function HistoryScreen() {
                           ))}
                         </View>
                       </View>
-                      <Text style={{ fontSize: 13.5, color: t.mutedForeground, lineHeight: 20 }} numberOfLines={2}>
-                        {s.preview}
-                      </Text>
-                      <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         <Text style={{ fontSize: 11.5, color: t.mutedForeground }}>{s.when}</Text>
                         <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: t.mutedForeground, opacity: 0.5 }} />
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>

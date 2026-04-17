@@ -1,9 +1,13 @@
+import { ChatHeader } from '@/components/chat/ChatHeader';
 import { useTheme } from '@/hooks/useTheme';
+import { SESSION_DURATION_SECONDS, SESSION_WARNING_SECONDS } from '@/constants/config';
 import { useRouter } from 'expo-router';
-import { ArrowUp, ChevronLeft, Clock, MoreVertical, Shield } from 'lucide-react-native';
+import { ArrowUp, Clock } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   Text,
@@ -36,14 +40,43 @@ export default function ChatScreen() {
   const t = useTheme();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
-  const [timeLeft, setTimeLeft] = useState(14 * 60 + 29);
+  const [timeLeft, setTimeLeft] = useState(SESSION_DURATION_SECONDS);
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState<Message[]>(INITIAL);
 
+  const isWarning = timeLeft <= SESSION_WARNING_SECONDS && timeLeft > 0;
+  const isExpired = timeLeft === 0;
+
   useEffect(() => {
-    const timer = setInterval(() => setTimeLeft((p) => (p > 0 ? p - 1 : 0)), 1000);
+    if (sessionEnded) return;
+    const timer = setInterval(() => {
+      setTimeLeft((p) => {
+        if (p <= 1) { clearInterval(timer); return 0; }
+        return p - 1;
+      });
+    }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [sessionEnded]);
+
+  const handleSessionEnd = () => {
+    setSessionEnded(true);
+    router.push('/rating' as never);
+  };
+
+  const handleExit = () => {
+    Alert.alert(
+      'End session?',
+      'The conversation will close and messages will be deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'End Session', style: 'destructive', onPress: handleSessionEnd },
+      ]
+    );
+  };
+
+  const handleReport = () => setReportVisible(true);
 
   const send = () => {
     const text = draft.trim();
@@ -54,41 +87,41 @@ export default function ChatScreen() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
+  const timerColor = isWarning || isExpired ? t.destructive : t.primary;
+  const timerBg = isWarning || isExpired
+    ? `${t.destructive}18`
+    : t.primarySoft;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.background }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
 
-        {/* Header */}
-        <View style={{ paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: t.background, borderBottomWidth: 1, borderBottomColor: t.border }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ height: 36, width: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
-            <ChevronLeft size={24} color={t.foreground} strokeWidth={2} style={{ opacity: 0.7 }} />
-          </TouchableOpacity>
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={{ height: 36, width: 36, borderRadius: 18, backgroundColor: t.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-              <Shield size={18} color={t.primary} strokeWidth={2} />
-            </View>
-            <View>
-              <Text style={{ fontFamily: 'Georgia', fontSize: 16, fontWeight: '600', color: t.foreground, lineHeight: 20 }}>
-                Anonymous Listener
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={{ height: 6, width: 6, borderRadius: 3, backgroundColor: t.success }} />
-                <Text style={{ fontSize: 11.5, color: t.mutedForeground }}>Active now</Text>
-              </View>
-            </View>
+        <ChatHeader onExit={handleExit} onReport={handleReport} />
+
+        {/* Timer pill */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, backgroundColor: timerBg, borderWidth: 1, borderColor: timerColor + '33' }}>
+            <Clock size={12} color={timerColor} />
+            <Text style={{ fontSize: 11.5, fontWeight: '500', color: timerColor }}>
+              {isExpired ? 'Session time is up' : `${formatTime(timeLeft)} remaining`}
+            </Text>
           </View>
-          <TouchableOpacity style={{ height: 36, width: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
-            <MoreVertical size={20} color={t.foreground} style={{ opacity: 0.7 }} />
-          </TouchableOpacity>
         </View>
 
-        {/* Timer */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, alignItems: 'center' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, backgroundColor: t.primarySoft, borderWidth: 1, borderColor: t.border }}>
-            <Clock size={12} color={t.primary} />
-            <Text style={{ fontSize: 11.5, fontWeight: '500', color: t.primary }}>{formatTime(timeLeft)} remaining</Text>
+        {/* Soft-end banner */}
+        {isExpired && (
+          <View style={{ marginHorizontal: 16, marginTop: 8, borderRadius: 12, backgroundColor: t.elevated, borderWidth: 1, borderColor: t.border, padding: 14, alignItems: 'center', gap: 12 }}>
+            <Text style={{ fontFamily: 'Georgia', fontSize: 14, color: t.foreground, textAlign: 'center', lineHeight: 20 }}>
+              Your session time is up. You can keep talking or wrap up.
+            </Text>
+            <TouchableOpacity
+              onPress={handleSessionEnd}
+              style={{ paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999, backgroundColor: t.destructive }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>End Session</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        )}
 
         {/* Messages */}
         <ScrollView
@@ -146,6 +179,36 @@ export default function ChatScreen() {
           </Text>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Report modal */}
+      <Modal visible={reportVisible} transparent animationType="fade" onRequestClose={() => setReportVisible(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setReportVisible(false)}
+        >
+          <View style={{ backgroundColor: t.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, gap: 12 }}>
+            <Text style={{ fontFamily: 'Georgia', fontSize: 16, fontWeight: '600', color: t.foreground, textAlign: 'center', marginBottom: 4 }}>
+              Report this user?
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setReportVisible(false);
+                Alert.alert('Reported', 'Thank you. Our team will review this session.');
+              }}
+              style={{ paddingVertical: 16, borderRadius: 12, backgroundColor: `${t.destructive}18`, alignItems: 'center' }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '600', color: t.destructive }}>Report User</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setReportVisible(false)}
+              style={{ paddingVertical: 16, borderRadius: 12, backgroundColor: t.muted, alignItems: 'center' }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '500', color: t.foreground }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }

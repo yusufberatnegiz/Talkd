@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Talkd",
+    "slug": "talkd-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "talkd",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.talkd.app",
+      "usesAppleSignIn": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-apple-authentication"
+    ]
+  }
+}

@@ -13,14 +13,6 @@ const TOPICS = [
   { topic: 'sleep-rest', title: 'Sleep & Rest', description: 'Late-night thoughts and wind-down talks', listeners: 9, Icon: Moon },
 ] as const;
 
-const MOODS = [
-  { e: '🌿', l: 'Calm' },
-  { e: '🌧️', l: 'Low' },
-  { e: '😰', l: 'Anxious' },
-  { e: '🔥', l: 'Angry' },
-  { e: '✨', l: 'Hopeful' },
-  { e: '😴', l: 'Tired' },
-];
 
 function getToday() {
   const d = new Date();
@@ -85,33 +77,6 @@ export default function HomeScreen() {
               </View>
             </View>
           </TouchableOpacity>
-        </View>
-
-        {/* Mood check-in */}
-        <View style={{ marginTop: 28 }}>
-          <Text style={{ fontFamily: 'Georgia', fontSize: 15, fontWeight: '600', color: t.foreground, marginBottom: 10, paddingHorizontal: 20 }}>
-            How are you feeling?
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
-          >
-            {MOODS.map((m) => (
-              <TouchableOpacity
-                key={m.l}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 8,
-                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12,
-                  backgroundColor: t.surface, borderWidth: 1, borderColor: t.border,
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={{ fontSize: 16 }}>{m.e}</Text>
-                <Text style={{ fontSize: 13, fontWeight: '500', color: t.foreground }}>{m.l}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </View>
 
         {/* Topics */}

@@ -23,22 +23,6 @@ export function ChatHeader({ onExit, onReport }: ChatHeaderProps) {
         borderBottomColor: t.border,
       }}
     >
-      {/* Exit — always visible, 1 tap */}
-      <TouchableOpacity
-        onPress={onExit}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        style={{
-          height: 36,
-          width: 36,
-          borderRadius: 18,
-          backgroundColor: t.muted,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <LogOut size={17} color={t.foreground} strokeWidth={2} />
-      </TouchableOpacity>
-
       {/* Listener info */}
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <View
@@ -64,7 +48,7 @@ export function ChatHeader({ onExit, onReport }: ChatHeaderProps) {
         </View>
       </View>
 
-      {/* Report — always visible, 1 tap */}
+      {/* Report */}
       <TouchableOpacity
         onPress={onReport}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -78,6 +62,22 @@ export function ChatHeader({ onExit, onReport }: ChatHeaderProps) {
         }}
       >
         <Flag size={17} color={t.destructive} strokeWidth={2} />
+      </TouchableOpacity>
+
+      {/* Exit */}
+      <TouchableOpacity
+        onPress={onExit}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        style={{
+          height: 36,
+          width: 36,
+          borderRadius: 18,
+          backgroundColor: t.muted,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <LogOut size={17} color={t.foreground} strokeWidth={2} />
       </TouchableOpacity>
     </View>
   );

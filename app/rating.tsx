@@ -1,3 +1,4 @@
+import { useTheme } from '@/hooks/useTheme';
 import { useRouter } from 'expo-router';
 import { CheckCircle2, Star } from 'lucide-react-native';
 import { useState } from 'react';
@@ -27,9 +28,9 @@ const NEGATIVE_LABELS = [
 ] as const;
 
 export default function RatingScreen() {
+  const t = useTheme();
   const router = useRouter();
   const [rating, setRating] = useState(0);
-  const [hoveredRating] = useState(0);
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
 
@@ -42,82 +43,62 @@ export default function RatingScreen() {
   const handleRatingChange = (newRating: number) => {
     const wasPositive = rating >= 3;
     const isPositive = newRating >= 3;
-    if (rating > 0 && wasPositive !== isPositive) {
-      setSelectedLabels([]);
-    }
+    if (rating > 0 && wasPositive !== isPositive) setSelectedLabels([]);
     setRating(newRating);
   };
 
   if (submitted) {
     return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center px-6">
-        <View
-          className="w-20 h-20 rounded-full items-center justify-center mb-6"
-          style={{ backgroundColor: 'rgba(99,102,241,0.2)' }}
-        >
-          <CheckCircle2 size={40} color="#6366f1" />
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: t.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+          <CheckCircle2 size={40} color={t.primary} />
         </View>
-        <Text className="text-xl font-semibold text-foreground mb-2 text-center">
-          Thank you for your feedback!
+        <Text style={{ fontFamily: 'Georgia', fontSize: 22, fontWeight: '600', color: t.foreground, textAlign: 'center', marginBottom: 8 }}>
+          Thank you
         </Text>
-        <Text className="text-muted-foreground text-sm text-center leading-relaxed">
-          Your rating helps us improve the experience for everyone.
+        <Text style={{ fontSize: 14, color: t.mutedForeground, textAlign: 'center', lineHeight: 22 }}>
+          Your feedback helps us improve the experience for everyone.
         </Text>
       </SafeAreaView>
     );
   }
 
   const labels = rating >= 3 ? POSITIVE_LABELS : NEGATIVE_LABELS;
-  const displayRating = hoveredRating || rating;
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.background }}>
       <ScrollView
-        className="flex-1 px-5"
+        style={{ flex: 1, paddingHorizontal: 20 }}
         contentContainerStyle={{ paddingTop: 32, paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Session complete banner */}
-        <View
-          className="rounded-2xl p-4 mb-8 items-center border"
-          style={{
-            backgroundColor: 'rgba(99,102,241,0.1)',
-            borderColor: 'rgba(99,102,241,0.2)',
-          }}
-        >
-          <View
-            className="w-12 h-12 rounded-full items-center justify-center mb-3"
-            style={{ backgroundColor: 'rgba(99,102,241,0.2)' }}
-          >
-            <CheckCircle2 size={24} color="#6366f1" />
+        <View style={{ borderRadius: 16, padding: 20, marginBottom: 32, alignItems: 'center', backgroundColor: t.elevated, borderWidth: 1, borderColor: t.border }}>
+          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: t.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+            <CheckCircle2 size={24} color={t.primary} />
           </View>
-          <Text className="text-foreground font-medium">Session Complete</Text>
-          <Text className="text-muted-foreground text-sm mt-1">Duration: 15 minutes</Text>
+          <Text style={{ fontFamily: 'Georgia', fontSize: 17, fontWeight: '600', color: t.foreground }}>Session Complete</Text>
+          <Text style={{ fontSize: 13, color: t.mutedForeground, marginTop: 4 }}>Duration: 15 minutes</Text>
         </View>
 
-        {/* Rating section */}
-        <View className="items-center mb-6">
-          <Text className="text-lg font-semibold text-foreground mb-2">
+        {/* Prompt */}
+        <View style={{ alignItems: 'center', marginBottom: 24 }}>
+          <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: t.foreground, marginBottom: 6 }}>
             How was your experience?
           </Text>
-          <Text className="text-muted-foreground text-sm">
+          <Text style={{ fontSize: 13.5, color: t.mutedForeground }}>
             Rate your conversation with your listener
           </Text>
         </View>
 
         {/* Stars */}
-        <View className="flex-row items-center justify-center gap-2 mb-8">
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 32 }}>
           {[1, 2, 3, 4, 5].map((star) => (
-            <TouchableOpacity
-              key={star}
-              onPress={() => handleRatingChange(star)}
-              className="p-1"
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity key={star} onPress={() => handleRatingChange(star)} style={{ padding: 4 }} activeOpacity={0.7}>
               <Star
                 size={40}
-                color={star <= displayRating ? '#6366f1' : 'rgba(152,152,170,0.4)'}
-                fill={star <= displayRating ? '#6366f1' : 'transparent'}
+                color={star <= rating ? t.primary : t.border}
+                fill={star <= rating ? t.primary : 'transparent'}
               />
             </TouchableOpacity>
           ))}
@@ -125,39 +106,28 @@ export default function RatingScreen() {
 
         {/* Label chips */}
         {rating > 0 && (
-          <View className="mb-6">
-            <Text className="text-sm text-muted-foreground mb-3 text-center">
-              {rating >= 3
-                ? 'What made this session great?'
-                : 'What went wrong with this session?'}
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ fontSize: 13, color: t.mutedForeground, marginBottom: 12, textAlign: 'center' }}>
+              {rating >= 3 ? 'What made this session great?' : 'What went wrong with this session?'}
             </Text>
-            <View className="flex-row flex-wrap gap-2 justify-center">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
               {labels.map((label) => {
                 const isSelected = selectedLabels.includes(label);
+                const selectedBg = rating >= 3 ? t.primary : t.destructive;
                 return (
                   <TouchableOpacity
                     key={label}
                     onPress={() => toggleLabel(label)}
-                    className="px-3 py-1.5 rounded-full"
-                    style={
-                      isSelected
-                        ? {
-                            backgroundColor:
-                              rating >= 3 ? '#6366f1' : '#ef4444',
-                          }
-                        : {
-                            backgroundColor: '#252538',
-                            borderWidth: 1,
-                            borderColor: 'rgba(58,58,85,0.5)',
-                          }
-                    }
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      backgroundColor: isSelected ? selectedBg : t.muted,
+                      borderWidth: 1,
+                      borderColor: isSelected ? selectedBg : t.border,
+                    }}
                   >
-                    <Text
-                      className="text-xs font-medium"
-                      style={{
-                        color: isSelected ? '#ffffff' : '#9898aa',
-                      }}
-                    >
+                    <Text style={{ fontSize: 12.5, fontWeight: '500', color: isSelected ? '#fff' : t.mutedForeground }}>
                       {label}
                     </Text>
                   </TouchableOpacity>
@@ -171,22 +141,16 @@ export default function RatingScreen() {
         <TouchableOpacity
           onPress={() => setSubmitted(true)}
           disabled={rating === 0}
-          className="w-full py-4 rounded-2xl items-center"
-          style={{
-            backgroundColor: rating > 0 ? '#6366f1' : '#2d2d45',
-          }}
+          style={{ paddingVertical: 16, borderRadius: 14, alignItems: 'center', backgroundColor: rating > 0 ? t.primary : t.muted }}
         >
-          <Text
-            className="font-medium"
-            style={{ color: rating > 0 ? '#ffffff' : '#9898aa' }}
-          >
+          <Text style={{ fontSize: 15, fontWeight: '600', color: rating > 0 ? t.primaryForeground : t.mutedForeground }}>
             Submit Feedback
           </Text>
         </TouchableOpacity>
 
         {/* Skip */}
-        <TouchableOpacity className="mt-3 items-center" onPress={() => router.back()}>
-          <Text className="text-sm text-muted-foreground">Skip for now</Text>
+        <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={() => router.back()}>
+          <Text style={{ fontSize: 13.5, color: t.mutedForeground }}>Skip for now</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

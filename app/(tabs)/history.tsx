@@ -1,4 +1,5 @@
 import { BottomNav } from '@/components/BottomNav';
+import { useTheme } from '@/hooks/useTheme';
 import { Clock, Heart, MessageSquare, Star, TrendingUp, Users } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -19,38 +20,42 @@ const SESSIONS = [
 ] as const;
 
 export default function HistoryScreen() {
+  const t = useTheme();
+
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.background }}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
 
         {/* Header */}
-        <View className="px-5 pt-12 pb-5">
-          <Text style={{ fontSize: 12, letterSpacing: 1.4, color: '#9090aa', fontWeight: '500', textTransform: 'uppercase' }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 48, paddingBottom: 20 }}>
+          <Text style={{ fontSize: 12, letterSpacing: 1.4, color: t.mutedForeground, fontWeight: '500', textTransform: 'uppercase' }}>
             Your journey
           </Text>
-          <Text style={{ fontFamily: 'Georgia', fontSize: 34, lineHeight: 38, fontWeight: '600', color: '#eeeef5', marginTop: 4 }}>
+          <Text style={{ fontFamily: 'Georgia', fontSize: 34, lineHeight: 38, fontWeight: '600', color: t.foreground, marginTop: 4 }}>
             History
           </Text>
         </View>
 
         {/* Summary card */}
-        <View className="px-5">
-          <View className="rounded-2xl bg-surface border border-border p-5">
-            <View className="flex-row items-center gap-2 mb-3">
-              <TrendingUp size={14} color="#6366f1" />
-              <Text style={{ fontSize: 12, color: '#9090aa' }}>Last 30 days</Text>
+        <View style={{ paddingHorizontal: 20 }}>
+          <View style={{ borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, padding: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <TrendingUp size={14} color={t.primary} />
+              <Text style={{ fontSize: 12, color: t.mutedForeground }}>Last 30 days</Text>
             </View>
-            <View className="flex-row">
+            <View style={{ flexDirection: 'row' }}>
               {[{ v: '12', l: 'Sessions' }, { v: '4.2', l: 'Avg rating' }, { v: '5h', l: 'Total time' }].map((s, i) => (
                 <View
                   key={s.l}
-                  className="flex-1 items-center"
-                  style={i > 0 ? { borderLeftWidth: 1, borderLeftColor: '#2e2e4a' } : undefined}
+                  style={[
+                    { flex: 1, alignItems: 'center' },
+                    i > 0 ? { borderLeftWidth: 1, borderLeftColor: t.border } : undefined,
+                  ]}
                 >
-                  <Text style={{ fontFamily: 'Georgia', fontSize: 26, fontWeight: '600', color: '#eeeef5', lineHeight: 30 }}>
+                  <Text style={{ fontFamily: 'Georgia', fontSize: 26, fontWeight: '600', color: t.foreground, lineHeight: 30 }}>
                     {s.v}
                   </Text>
-                  <Text style={{ marginTop: 6, fontSize: 11.5, color: '#9090aa' }}>{s.l}</Text>
+                  <Text style={{ marginTop: 6, fontSize: 11.5, color: t.mutedForeground }}>{s.l}</Text>
                 </View>
               ))}
             </View>
@@ -58,47 +63,45 @@ export default function HistoryScreen() {
         </View>
 
         {/* Sessions list */}
-        <View className="px-5 mt-7">
-          <Text style={{ fontFamily: 'Georgia', fontSize: 15, fontWeight: '600', color: '#eeeef5', marginBottom: 12 }}>
+        <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
+          <Text style={{ fontFamily: 'Georgia', fontSize: 15, fontWeight: '600', color: t.foreground, marginBottom: 12 }}>
             Conversations
           </Text>
-          <View className="rounded-xl bg-surface border border-border overflow-hidden">
+          <View style={{ borderRadius: 12, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, overflow: 'hidden' }}>
             {SESSIONS.map((s, i) => {
               const Icon = iconMap[s.topic] ?? MessageSquare;
               return (
                 <TouchableOpacity
                   key={i}
-                  className="p-4"
-                  style={i < SESSIONS.length - 1 ? { borderBottomWidth: 1, borderBottomColor: '#2e2e4a' } : undefined}
+                  style={[
+                    { padding: 16 },
+                    i < SESSIONS.length - 1 ? { borderBottomWidth: 1, borderBottomColor: t.border } : undefined,
+                  ]}
                   activeOpacity={0.7}
                 >
-                  <View className="flex-row items-start gap-3">
-                    <View className="h-10 w-10 rounded-xl bg-primary-soft items-center justify-center flex-shrink-0">
-                      <Icon size={18} color="#6366f1" strokeWidth={2} />
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                    <View style={{ height: 40, width: 40, borderRadius: 12, backgroundColor: t.primarySoft, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={18} color={t.primary} strokeWidth={2} />
                     </View>
-                    <View className="flex-1">
-                      <View className="flex-row items-center justify-between gap-2 mb-1">
-                        <Text style={{ fontSize: 15, fontWeight: '600', color: '#eeeef5' }}>{s.topic}</Text>
-                        <View className="flex-row items-center">
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: t.foreground }}>{s.topic}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           {Array.from({ length: 5 }).map((_, idx) => (
-                            <Star
-                              key={idx}
-                              size={12}
-                              color={idx < s.rating ? '#6366f1' : 'rgba(144,144,170,0.3)'}
-                              fill={idx < s.rating ? '#6366f1' : 'transparent'}
-                            />
+                            <Star key={idx} size={12} color={idx < s.rating ? t.primary : t.border}
+                              fill={idx < s.rating ? t.primary : 'transparent'} />
                           ))}
                         </View>
                       </View>
-                      <Text style={{ fontSize: 13.5, color: '#9090aa', lineHeight: 20 }} numberOfLines={2}>
+                      <Text style={{ fontSize: 13.5, color: t.mutedForeground, lineHeight: 20 }} numberOfLines={2}>
                         {s.preview}
                       </Text>
-                      <View className="mt-2.5 flex-row items-center gap-3">
-                        <Text style={{ fontSize: 11.5, color: '#9090aa' }}>{s.when}</Text>
-                        <View className="w-0.5 h-0.5 rounded-full bg-muted-foreground" />
-                        <View className="flex-row items-center gap-1">
-                          <Clock size={12} color="#9090aa" />
-                          <Text style={{ fontSize: 11.5, color: '#9090aa' }}>{s.duration}</Text>
+                      <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <Text style={{ fontSize: 11.5, color: t.mutedForeground }}>{s.when}</Text>
+                        <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: t.mutedForeground, opacity: 0.5 }} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Clock size={12} color={t.mutedForeground} />
+                          <Text style={{ fontSize: 11.5, color: t.mutedForeground }}>{s.duration}</Text>
                         </View>
                       </View>
                     </View>

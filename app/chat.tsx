@@ -1,3 +1,4 @@
+import { useTheme } from '@/hooks/useTheme';
 import { useRouter } from 'expo-router';
 import { ArrowUp, ChevronLeft, Clock, MoreVertical, Shield } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -32,6 +33,7 @@ function formatTime(seconds: number): string {
 }
 
 export default function ChatScreen() {
+  const t = useTheme();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
   const [timeLeft, setTimeLeft] = useState(14 * 60 + 29);
@@ -39,8 +41,8 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>(INITIAL);
 
   useEffect(() => {
-    const t = setInterval(() => setTimeLeft((p) => (p > 0 ? p - 1 : 0)), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setTimeLeft((p) => (p > 0 ? p - 1 : 0)), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const send = () => {
@@ -53,60 +55,45 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        {/* Header */}
-        <View
-          className="px-3 pb-3 pt-3 flex-row items-center gap-2 border-b border-border"
-          style={{ backgroundColor: 'rgba(22,22,42,0.8)' }}
-        >
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="h-9 w-9 rounded-full items-center justify-center"
-          >
-            <ChevronLeft size={24} color="rgba(238,238,245,0.7)" strokeWidth={2} />
-          </TouchableOpacity>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.background }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
 
-          <View className="flex-1 flex-row items-center gap-2.5">
-            <View className="h-9 w-9 rounded-full bg-primary-soft items-center justify-center">
-              <Shield size={18} color="#6366f1" strokeWidth={2} />
+        {/* Header */}
+        <View style={{ paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: t.background, borderBottomWidth: 1, borderBottomColor: t.border }}>
+          <TouchableOpacity onPress={() => router.back()} style={{ height: 36, width: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
+            <ChevronLeft size={24} color={t.foreground} strokeWidth={2} style={{ opacity: 0.7 }} />
+          </TouchableOpacity>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ height: 36, width: 36, borderRadius: 18, backgroundColor: t.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+              <Shield size={18} color={t.primary} strokeWidth={2} />
             </View>
             <View>
-              <Text style={{ fontFamily: 'Georgia', fontSize: 16, fontWeight: '600', color: '#eeeef5', lineHeight: 20 }}>
+              <Text style={{ fontFamily: 'Georgia', fontSize: 16, fontWeight: '600', color: t.foreground, lineHeight: 20 }}>
                 Anonymous Listener
               </Text>
-              <View className="flex-row items-center gap-1.5">
-                <View className="h-1.5 w-1.5 rounded-full bg-success" />
-                <Text style={{ fontSize: 11.5, color: '#9090aa' }}>Active now</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ height: 6, width: 6, borderRadius: 3, backgroundColor: t.success }} />
+                <Text style={{ fontSize: 11.5, color: t.mutedForeground }}>Active now</Text>
               </View>
             </View>
           </View>
-
-          <TouchableOpacity className="h-9 w-9 rounded-full items-center justify-center">
-            <MoreVertical size={20} color="rgba(238,238,245,0.7)" />
+          <TouchableOpacity style={{ height: 36, width: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
+            <MoreVertical size={20} color={t.foreground} style={{ opacity: 0.7 }} />
           </TouchableOpacity>
         </View>
 
         {/* Timer */}
-        <View className="px-4 pt-3 pb-1 items-center">
-          <View
-            className="flex-row items-center gap-1.5 px-3 py-1 rounded-full border"
-            style={{ backgroundColor: 'rgba(99,102,241,0.08)', borderColor: 'rgba(99,102,241,0.1)' }}
-          >
-            <Clock size={12} color="#6366f1" />
-            <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#6366f1' }}>
-              {formatTime(timeLeft)} remaining
-            </Text>
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, backgroundColor: t.primarySoft, borderWidth: 1, borderColor: t.border }}>
+            <Clock size={12} color={t.primary} />
+            <Text style={{ fontSize: 11.5, fontWeight: '500', color: t.primary }}>{formatTime(timeLeft)} remaining</Text>
           </View>
         </View>
 
         {/* Messages */}
         <ScrollView
           ref={scrollRef}
-          className="flex-1 px-4 py-3"
+          style={{ flex: 1, paddingHorizontal: 16, paddingTop: 12 }}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
         >
@@ -115,65 +102,46 @@ export default function ChatScreen() {
             const prev = messages[idx - 1];
             const grouped = prev && prev.from === m.from;
             return (
-              <View
-                key={m.id}
-                style={[
-                  { alignItems: mine ? 'flex-end' : 'flex-start' },
-                  !grouped && { marginTop: 12 },
-                ]}
-              >
-                <View
-                  style={[
-                    { maxWidth: '80%', paddingHorizontal: 14, paddingVertical: 10 },
-                    mine
-                      ? { backgroundColor: '#6366f1', borderRadius: 16, borderBottomRightRadius: 4 }
-                      : { backgroundColor: '#1e1e36', borderWidth: 1, borderColor: '#2e2e4a', borderRadius: 16, borderBottomLeftRadius: 4 },
-                  ]}
-                >
-                  <Text style={{ fontSize: 15, lineHeight: 22, color: mine ? '#fff' : '#eeeef5' }}>
+              <View key={m.id} style={[{ alignItems: mine ? 'flex-end' : 'flex-start' }, !grouped && { marginTop: 12 }]}>
+                <View style={[
+                  { maxWidth: '80%', paddingHorizontal: 14, paddingVertical: 10 },
+                  mine
+                    ? { backgroundColor: t.primary, borderRadius: 16, borderBottomRightRadius: 4 }
+                    : { backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 16, borderBottomLeftRadius: 4 },
+                ]}>
+                  <Text style={{ fontSize: 15, lineHeight: 22, color: mine ? t.primaryForeground : t.foreground }}>
                     {m.text}
                   </Text>
                 </View>
-                <Text style={{ marginTop: 4, paddingHorizontal: 4, fontSize: 10.5, color: '#9090aa' }}>
-                  {m.time}
-                </Text>
+                <Text style={{ marginTop: 4, paddingHorizontal: 4, fontSize: 10.5, color: t.mutedForeground }}>{m.time}</Text>
               </View>
             );
           })}
+          <View style={{ height: 12 }} />
         </ScrollView>
 
         {/* Composer */}
-        <View className="px-3 pt-2 pb-5 border-t border-border">
-          <View
-            className="flex-row items-end gap-2 rounded-2xl px-3 py-2 border"
-            style={{ backgroundColor: '#1e1e36', borderColor: '#2e2e4a' }}
-          >
+        <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 20, borderTopWidth: 1, borderTopColor: t.border }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, backgroundColor: t.surface, borderColor: t.border }}>
             <TextInput
               value={draft}
               onChangeText={setDraft}
               onSubmitEditing={send}
               placeholder="Message…"
-              placeholderTextColor="#9090aa"
+              placeholderTextColor={t.mutedForeground}
               returnKeyType="send"
               multiline
-              style={{
-                flex: 1,
-                fontSize: 15,
-                color: '#eeeef5',
-                paddingVertical: 6,
-                maxHeight: 120,
-              }}
+              style={{ flex: 1, fontSize: 15, color: t.foreground, paddingVertical: 6, maxHeight: 120 }}
             />
             <TouchableOpacity
               onPress={send}
               disabled={!draft.trim()}
-              className="h-8 w-8 rounded-full items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: draft.trim() ? '#6366f1' : '#2d2d4a' }}
+              style={{ height: 32, width: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0, backgroundColor: draft.trim() ? t.primary : t.muted }}
             >
-              <ArrowUp size={16} color={draft.trim() ? '#fff' : '#9090aa'} strokeWidth={2.5} />
+              <ArrowUp size={16} color={draft.trim() ? t.primaryForeground : t.mutedForeground} strokeWidth={2.5} />
             </TouchableOpacity>
           </View>
-          <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 10.5, color: '#9090aa' }}>
+          <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 10.5, color: t.mutedForeground }}>
             End-to-end encrypted · Anonymous
           </Text>
         </View>

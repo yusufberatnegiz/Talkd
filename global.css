@@ -1,3 +1,53 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --background: #F1F4F0;
+  --foreground: #23302A;
+  --surface: #FFFFFF;
+  --elevated: #F9FBF8;
+  --card: #FFFFFF;
+  --primary: #2E4A39;
+  --primary-foreground: #F8FBF7;
+  --primary-soft: #E2EAE1;
+  --primary-ink: #233C2D;
+  --secondary: #EEF1ED;
+  --secondary-foreground: #3E4E43;
+  --muted: #ECEFEB;
+  --muted-foreground: #77807A;
+  --accent: #DCE9DC;
+  --accent-foreground: #405B48;
+  --destructive: #D24A3D;
+  --success: #4E9E6C;
+  --warning: #D9A441;
+  --border: #DDE2DB;
+  --input: #DDE2DB;
+  --ring: #2E4A39;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #1F2622;
+    --foreground: #F1F4EF;
+    --surface: #2A312D;
+    --elevated: #313934;
+    --card: #2A312D;
+    --primary: #7DAE87;
+    --primary-foreground: #1A201C;
+    --primary-soft: #3E5748;
+    --primary-ink: #AFCFB4;
+    --secondary: #353C38;
+    --secondary-foreground: #A9B1AC;
+    --muted: #353C38;
+    --muted-foreground: #A9B1AC;
+    --accent: #3E5748;
+    --accent-foreground: #BFD9C1;
+    --destructive: #E56456;
+    --success: #7DC892;
+    --warning: #E2B04F;
+    --border: rgba(255,255,255,0.08);
+    --input: rgba(255,255,255,0.12);
+    --ring: #7DAE87;
+  }
+}

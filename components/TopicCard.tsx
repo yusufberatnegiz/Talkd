@@ -1,3 +1,4 @@
+import { useTheme } from '@/hooks/useTheme';
 import { useRouter } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -13,30 +14,47 @@ interface TopicCardProps {
 
 export function TopicCard({ title, description, listeners, Icon }: TopicCardProps) {
   const router = useRouter();
+  const t = useTheme();
 
   return (
     <TouchableOpacity
       onPress={() => router.push('/chat' as never)}
-      className="rounded-xl bg-surface border border-border p-4"
+      style={{
+        borderRadius: 12,
+        backgroundColor: t.surface,
+        borderWidth: 1,
+        borderColor: t.border,
+        padding: 16,
+      }}
       activeOpacity={0.7}
     >
-      <View className="flex-row items-start gap-4">
-        <View className="h-11 w-11 rounded-xl bg-primary-soft items-center justify-center flex-shrink-0">
-          <Icon size={18} color="#6366f1" strokeWidth={2} />
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 16 }}>
+        <View
+          style={{
+            height: 44,
+            width: 44,
+            borderRadius: 12,
+            backgroundColor: t.primarySoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Icon size={18} color={t.primary} strokeWidth={2} />
         </View>
-        <View className="flex-1">
-          <View className="flex-row items-start justify-between gap-2">
-            <Text style={{ fontFamily: 'Georgia', fontSize: 17, fontWeight: '600', color: '#eeeef5', lineHeight: 22 }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+            <Text style={{ fontFamily: 'Georgia', fontSize: 17, fontWeight: '600', color: t.foreground, lineHeight: 22 }}>
               {title}
             </Text>
-            <ChevronRight size={16} color="rgba(144,144,170,0.6)" style={{ marginTop: 2 }} />
+            <ChevronRight size={16} color={t.mutedForeground} style={{ marginTop: 2, opacity: 0.6 }} />
           </View>
-          <Text className="mt-1 text-sm text-muted-foreground leading-relaxed">{description}</Text>
-          <View className="mt-3 flex-row items-center gap-1.5">
-            <View className="relative">
-              <View className="w-1.5 h-1.5 rounded-full bg-success" />
-            </View>
-            <Text style={{ fontSize: 11.5, color: '#9090aa' }}>{listeners} listeners online</Text>
+          <Text style={{ marginTop: 4, fontSize: 13.5, color: t.mutedForeground, lineHeight: 20 }}>
+            {description}
+          </Text>
+          <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.success }} />
+            <Text style={{ fontSize: 11.5, color: t.mutedForeground }}>{listeners} listeners online</Text>
           </View>
         </View>
       </View>

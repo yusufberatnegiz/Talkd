@@ -1,110 +1,126 @@
 import { BottomNav } from '@/components/BottomNav';
-import { TopicCard } from '@/components/TopicCard';
+import { TOPICS } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
-import { Bell, Briefcase, Heart, MessageSquare, Moon, Sparkles, Users } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const TOPICS = [
-  { topic: 'mental-health', title: 'Mental Health', description: 'Anxiety, depression, stress and beyond', listeners: 24, Icon: Heart },
-  { topic: 'relationships', title: 'Relationships', description: 'Family, friends, dating and connection', listeners: 18, Icon: Users },
-  { topic: 'general-advice', title: 'General Advice', description: 'Life decisions and everyday challenges', listeners: 31, Icon: MessageSquare },
-  { topic: 'work-career', title: 'Work & Career', description: 'Burnout, growth, and finding direction', listeners: 12, Icon: Briefcase },
-  { topic: 'sleep-rest', title: 'Sleep & Rest', description: 'Late-night thoughts and wind-down talks', listeners: 9, Icon: Moon },
-] as const;
-
-
-function getToday() {
-  const d = new Date();
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const months = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
-  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+function Dot({ size = 6, color }: { size?: number; color: string }) {
+  return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />;
 }
 
 export default function HomeScreen() {
   const t = useTheme();
+  const router = useRouter();
+  const [listeners, setListeners] = useState(107);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setListeners(n => Math.max(82, Math.min(128, n + Math.floor(Math.random() * 7) - 3)));
+    }, 3500);
+    return () => clearInterval(id);
+  }, []);
+
+  const topicsArr = Object.values(TOPICS);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 16 }}
+        contentContainerStyle={{ paddingBottom: 8 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 48, paddingBottom: 20, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <View>
-            <Text style={{ fontSize: 12, letterSpacing: 1.4, color: t.mutedForeground, fontWeight: '500', textTransform: 'uppercase' }}>
-              {getToday()}
-            </Text>
-            <Text style={{ fontFamily: 'Georgia', fontSize: 34, lineHeight: 38, fontWeight: '600', color: t.foreground, marginTop: 4 }}>
-              {'Good to see\nyou again.'}
-            </Text>
+        {/* Top bar */}
+        <View style={{
+          flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+          paddingHorizontal: 24, paddingTop: 14,
+        }}>
+          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 18, color: t.ink3 }}>
+            talkd
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Dot size={6} color={t.amber} />
+            <Text style={{ fontSize: 12, color: t.ink3, letterSpacing: 0.4 }}>{listeners} online now</Text>
           </View>
-          <TouchableOpacity
-            style={{
-              height: 40, width: 40, borderRadius: 20,
-              backgroundColor: t.surface, borderWidth: 1, borderColor: t.border,
-              alignItems: 'center', justifyContent: 'center', marginTop: 4,
-            }}
-          >
-            <Bell size={18} color={t.foreground} strokeWidth={1.8} style={{ opacity: 0.7 }} />
-            <View style={{ position: 'absolute', top: 8, right: 8, width: 6, height: 6, borderRadius: 3, backgroundColor: t.primary }} />
-          </TouchableOpacity>
         </View>
 
-        {/* Hero CTA */}
-        <View style={{ paddingHorizontal: 20 }}>
-          <TouchableOpacity
-            style={{ borderRadius: 16, padding: 20, backgroundColor: t.primary, overflow: 'hidden' }}
-            activeOpacity={0.85}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.15)', alignSelf: 'flex-start', marginBottom: 12 }}>
-              <Sparkles size={12} color={t.primaryForeground} />
-              <Text style={{ fontSize: 11, fontWeight: '500', color: t.primaryForeground }}>Available now</Text>
-            </View>
-            <Text style={{ fontFamily: 'Georgia', fontSize: 24, fontWeight: '600', color: t.primaryForeground, lineHeight: 30 }}>
-              Start a quiet conversation
-            </Text>
-            <Text style={{ marginTop: 6, fontSize: 13.5, color: t.primaryForeground, opacity: 0.75, lineHeight: 20, maxWidth: 280 }}>
-              Connect anonymously with someone who'll really listen. No judgement, no records.
-            </Text>
-            <View style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: '500', color: t.primaryForeground }}>Begin now</Text>
-              <View style={{ height: 24, width: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: t.primaryForeground, fontSize: 14 }}>→</Text>
+        {/* Greeting */}
+        <View style={{ paddingHorizontal: 28, paddingTop: 40, paddingBottom: 24 }}>
+          <Text style={{ fontSize: 11, letterSpacing: 2.2, color: t.ink4, textTransform: 'uppercase', marginBottom: 16 }}>
+            ANONYMOUS · REAL TIME · NO RECORDS
+          </Text>
+          <Text style={{ fontFamily: 'Georgia', fontSize: 40, lineHeight: 44, letterSpacing: -0.8, color: t.ink }}>
+            {'What do you want to\ntalk about?'}
+          </Text>
+        </View>
+
+        {/* 2×3 topic grid */}
+        <View style={{
+          paddingHorizontal: 20,
+          flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+        }}>
+          {topicsArr.map((tp) => (
+            <TouchableOpacity
+              key={tp.key}
+              onPress={() => router.push({ pathname: '/intent', params: { topic: tp.key } } as never)}
+              style={{
+                width: '48%',
+                backgroundColor: t.bg3,
+                borderWidth: 0.5, borderColor: t.line,
+                borderRadius: 18, padding: 14,
+                minHeight: 112,
+                justifyContent: 'space-between',
+              }}
+              activeOpacity={0.75}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Dot size={7} color={tp.hue} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Dot size={4} color={tp.hue} />
+                  <Text style={{ fontSize: 10.5, color: tp.hue, letterSpacing: 0.3 }}>{tp.n}</Text>
+                </View>
               </View>
+              <View>
+                <Text style={{ fontFamily: 'Georgia', fontSize: 20, letterSpacing: -0.3, lineHeight: 24, color: t.ink, marginBottom: 4 }}>
+                  {tp.label}
+                </Text>
+                <Text style={{ fontSize: 11.5, color: t.ink3, letterSpacing: 0.1, lineHeight: 15 }}>
+                  {tp.hint}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Listener CTA */}
+        <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
+          <Text style={{ fontSize: 11, letterSpacing: 2, color: t.ink4, textTransform: 'uppercase', marginBottom: 10, paddingLeft: 4 }}>
+            OR
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push('/listener' as never)}
+            style={{
+              backgroundColor: t.bg2, borderWidth: 0.5, borderColor: t.line,
+              borderRadius: 18, padding: 18,
+              flexDirection: 'row', alignItems: 'center', gap: 14,
+            }}
+            activeOpacity={0.75}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '500', letterSpacing: -0.2, color: t.coral }}>
+                Listen to someone tonight
+              </Text>
+              <Text style={{ fontSize: 12, color: t.ink3, marginTop: 2 }}>
+                Help out · 10–15 min each
+              </Text>
             </View>
+            <Text style={{ fontSize: 16, color: t.ink4 }}>→</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Topics */}
-        <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={{ fontFamily: 'Georgia', fontSize: 15, fontWeight: '600', color: t.foreground }}>
-              Topics
-            </Text>
-            <Text style={{ fontSize: 12, color: t.mutedForeground }}>{TOPICS.length} available</Text>
-          </View>
-          <View style={{ gap: 10 }}>
-            {TOPICS.map((topic) => (
-              <TopicCard key={topic.topic} {...topic} />
-            ))}
-          </View>
-        </View>
-
-        {/* Reassurance footer */}
-        <View style={{ paddingHorizontal: 20, marginTop: 32, marginBottom: 8 }}>
-          <View style={{ borderRadius: 12, backgroundColor: t.elevated, borderWidth: 1, borderColor: t.border, padding: 16 }}>
-            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 14, color: t.foreground, textAlign: 'center', lineHeight: 22, opacity: 0.8 }}>
-              "You don't have to carry it alone."
-            </Text>
-          </View>
         </View>
       </ScrollView>
 
-      <BottomNav active="Home" />
+      <BottomNav active="Talk" />
     </SafeAreaView>
   );
 }

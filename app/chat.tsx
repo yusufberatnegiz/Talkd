@@ -1,11 +1,9 @@
-import { ChatHeader } from '@/components/chat/ChatHeader';
-import { useTheme } from '@/hooks/useTheme';
 import { SESSION_DURATION_SECONDS, SESSION_WARNING_SECONDS } from '@/constants/config';
-import { useRouter } from 'expo-router';
-import { ArrowUp, Clock } from 'lucide-react-native';
+import { getTopic } from '@/constants/topics';
+import { useTheme } from '@/hooks/useTheme';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -24,191 +22,418 @@ interface Message {
   time: string;
 }
 
-const INITIAL: Message[] = [
-  { id: 1, from: 'them', text: "Hi there. I'm here to listen — whenever you're ready.", time: '2:30 PM' },
-  { id: 2, from: 'me', text: "I've been feeling really overwhelmed lately with everything going on.", time: '2:31 PM' },
-  { id: 3, from: 'them', text: "I hear you. Would you like to tell me more about what's been weighing on you?", time: '2:32 PM' },
-];
+function Sheet({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  const t = useTheme();
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+          <View style={{
+            backgroundColor: t.bg2, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+            padding: 20, paddingBottom: 36, borderTopWidth: 0.5, borderColor: t.line,
+          }}>
+            <View style={{ width: 36, height: 4, borderRadius: 99, backgroundColor: t.ink5, alignSelf: 'center', marginBottom: 18 }} />
+            {children}
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
 
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
+function ReportSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
+  const t = useTheme();
+  const [picked, setPicked] = useState<string | null>(null);
+  const reasons = ['Harassment or abuse', 'Sexual content', 'Hate or discrimination', 'Self-harm encouragement', 'Spam or selling', 'Something else'];
+  return (
+    <Sheet onClose={onClose}>
+      <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 26, color: t.ink, letterSpacing: -0.3, marginBottom: 4 }}>
+        Report this person
+      </Text>
+      <Text style={{ fontSize: 13, color: t.ink3, marginBottom: 18, lineHeight: 18 }}>
+        We'll end this conversation and review the session. You stay anonymous.
+      </Text>
+      <View style={{ gap: 6, marginBottom: 16 }}>
+        {reasons.map(r => (
+          <TouchableOpacity
+            key={r}
+            onPress={() => setPicked(r)}
+            style={{
+              padding: 13, borderRadius: 12,
+              backgroundColor: picked === r ? t.red + '20' : t.bg3,
+              borderWidth: picked === r ? 1 : 0.5,
+              borderColor: picked === r ? t.red + '60' : t.line,
+            }}
+          >
+            <Text style={{ fontSize: 14, color: picked === r ? t.red : t.ink }}>{r}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <TouchableOpacity
+        disabled={!picked}
+        onPress={onConfirm}
+        style={{
+          paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginBottom: 8,
+          backgroundColor: picked ? t.red : t.bg3,
+        }}
+      >
+        <Text style={{ fontSize: 14.5, fontWeight: '600', color: picked ? '#fff' : t.ink4 }}>
+          Submit report & end
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onClose} style={{ paddingVertical: 14, alignItems: 'center' }}>
+        <Text style={{ fontSize: 14, color: t.ink3 }}>Cancel</Text>
+      </TouchableOpacity>
+    </Sheet>
+  );
+}
+
+function ExitSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
+  const t = useTheme();
+  return (
+    <Sheet onClose={onClose}>
+      <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 26, color: t.ink, letterSpacing: -0.3, marginBottom: 4 }}>
+        End this conversation?
+      </Text>
+      <Text style={{ fontSize: 13, color: t.ink3, marginBottom: 20, lineHeight: 18 }}>
+        You can't come back to this one. We'll ask both of you for a quick rating.
+      </Text>
+      <TouchableOpacity
+        onPress={onConfirm}
+        style={{ paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: t.amber, marginBottom: 8 }}
+      >
+        <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.bg }}>End & rate</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onClose} style={{ paddingVertical: 14, alignItems: 'center' }}>
+        <Text style={{ fontSize: 14, color: t.ink3 }}>Keep talking</Text>
+      </TouchableOpacity>
+    </Sheet>
+  );
+}
+
+function ContinueSheet({ youAgreed, theyAgreed, onAgree, onDecline }: {
+  youAgreed: boolean; theyAgreed: boolean; onAgree: () => void; onDecline: () => void;
+}) {
+  const t = useTheme();
+  const both = youAgreed && theyAgreed;
+  return (
+    <Modal visible transparent animationType="slide">
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}>
+        <View style={{
+          backgroundColor: t.bg2, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+          padding: 20, paddingBottom: 36, borderTopWidth: 0.5, borderColor: t.line,
+        }}>
+          <View style={{ width: 36, height: 4, borderRadius: 99, backgroundColor: t.ink5, alignSelf: 'center', marginBottom: 18 }} />
+          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 26, color: t.ink, letterSpacing: -0.3, marginBottom: 4 }}>
+            {both ? 'No timer now.' : "Time's up."}
+          </Text>
+          <Text style={{ fontSize: 13, color: t.ink3, marginBottom: 20, lineHeight: 18 }}>
+            {both
+              ? 'You both chose to keep going. Stay as long as you need.'
+              : 'If you both want, you can keep talking without a timer. Either of you can leave any time.'}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+            {(['You', 'Them'] as const).map((label, i) => {
+              const agreed = i === 0 ? youAgreed : theyAgreed;
+              return (
+                <View key={label} style={{
+                  flex: 1, padding: 14, borderRadius: 14, alignItems: 'center',
+                  backgroundColor: agreed ? t.amber + '18' : t.bg3,
+                  borderWidth: agreed ? 1 : 0.5, borderColor: agreed ? t.amber + '60' : t.line,
+                }}>
+                  <Text style={{ fontSize: 11, color: t.ink3, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 }}>{label}</Text>
+                  <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: agreed ? t.amber : t.ink4 }}>
+                    {agreed ? '✓ Agreed' : 'Deciding…'}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+          {!both && (
+            <>
+              <TouchableOpacity
+                disabled={youAgreed}
+                onPress={onAgree}
+                style={{
+                  paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginBottom: 8,
+                  backgroundColor: youAgreed ? t.bg3 : t.amber,
+                }}
+              >
+                <Text style={{ fontSize: 14.5, fontWeight: '600', color: youAgreed ? t.ink3 : t.bg }}>
+                  {youAgreed ? 'Waiting for them…' : 'Keep talking (no timer)'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onDecline} style={{ paddingVertical: 14, alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, color: t.ink3 }}>End here</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 export default function ChatScreen() {
   const t = useTheme();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
-  const [timeLeft, setTimeLeft] = useState(SESSION_DURATION_SECONDS);
-  const [sessionEnded, setSessionEnded] = useState(false);
-  const [reportVisible, setReportVisible] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [messages, setMessages] = useState<Message[]>(INITIAL);
 
-  const isWarning = timeLeft <= SESSION_WARNING_SECONDS && timeLeft > 0;
-  const isExpired = timeLeft === 0;
+  const { topic: topicParam, specific } = useLocalSearchParams<{
+    topic: string; specific: string;
+  }>();
+  const tp = getTopic(topicParam ?? 'any');
+  const hue = tp.hue;
+
+  const [messages, setMessages] = useState<Message[]>([
+    { id: 1, from: 'them', text: "Hi. Take your time — no rush.", time: formatClock() },
+  ]);
+  const [draft, setDraft] = useState('');
+  const [timeLeft, setTimeLeft] = useState(SESSION_DURATION_SECONDS);
+  const [timerActive, setTimerActive] = useState(true);
+  const [untimed, setUntimed] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
+  const [continueOpen, setContinueOpen] = useState(false);
+  const [youAgreed, setYouAgreed] = useState(false);
+  const [theyAgreed, setTheyAgreed] = useState(false);
+  const [typing, setTyping] = useState(false);
+
+  function formatClock() {
+    const d = new Date();
+    const h = d.getHours() % 12 || 12;
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
+  function formatTime(s: number) {
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  const goToRating = () => router.replace({ pathname: '/rating', params: { topic: tp.key } } as never);
+
+  // Timer countdown
+  useEffect(() => {
+    if (!timerActive || untimed) return;
+    if (timeLeft <= 0) {
+      setTimerActive(false);
+      setContinueOpen(true);
+      setTimeout(() => setTheyAgreed(true), 2400);
+      return;
+    }
+    const id = setTimeout(() => setTimeLeft(n => n - 1), 1000);
+    return () => clearTimeout(id);
+  }, [timeLeft, timerActive, untimed]);
+
+  // Both agreed to continue
+  useEffect(() => {
+    if (youAgreed && theyAgreed && continueOpen) {
+      const id = setTimeout(() => { setContinueOpen(false); setUntimed(true); }, 900);
+      return () => clearTimeout(id);
+    }
+  }, [youAgreed, theyAgreed, continueOpen]);
 
   useEffect(() => {
-    if (sessionEnded) return;
-    const timer = setInterval(() => {
-      setTimeLeft((p) => {
-        if (p <= 1) { clearInterval(timer); return 0; }
-        return p - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [sessionEnded]);
-
-  const handleSessionEnd = () => {
-    setSessionEnded(true);
-    router.push('/rating' as never);
-  };
-
-  const handleExit = () => {
-    Alert.alert(
-      'End session?',
-      'The conversation will close and messages will be deleted.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'End Session', style: 'destructive', onPress: handleSessionEnd },
-      ]
-    );
-  };
-
-  const handleReport = () => setReportVisible(true);
+    scrollRef.current?.scrollToEnd({ animated: false });
+  }, [messages, typing]);
 
   const send = () => {
     const text = draft.trim();
     if (!text) return;
-    const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    setMessages((prev) => [...prev, { id: Date.now(), from: 'me', text, time }]);
+    setMessages(prev => [...prev, { id: Date.now(), from: 'me', text, time: formatClock() }]);
     setDraft('');
+    setTyping(true);
+    setTimeout(() => {
+      setTyping(false);
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        from: 'them',
+        text: "That sounds like a lot. What's weighing on you most?",
+        time: formatClock(),
+      }]);
+    }, 2200);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
-  const timerColor = isWarning || isExpired ? t.destructive : t.primary;
-  const timerBg = isWarning || isExpired
-    ? `${t.destructive}18`
-    : t.primarySoft;
+  const isWarning = timeLeft <= SESSION_WARNING_SECONDS && timeLeft > 0;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
 
-        <ChatHeader onExit={handleExit} onReport={handleReport} />
-
-        {/* Timer pill */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, alignItems: 'center' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, backgroundColor: timerBg, borderWidth: 1, borderColor: timerColor + '33' }}>
-            <Clock size={12} color={timerColor} />
-            <Text style={{ fontSize: 11.5, fontWeight: '500', color: timerColor }}>
-              {isExpired ? 'Session time is up' : `${formatTime(timeLeft)} remaining`}
-            </Text>
+        {/* Header */}
+        <View style={{
+          paddingHorizontal: 12, paddingVertical: 12,
+          borderBottomWidth: 0.5, borderBottomColor: t.line,
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+        }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 4 }}>
+            <View style={{
+              width: 32, height: 32, borderRadius: 16,
+              backgroundColor: hue + '22', borderWidth: 0.5, borderColor: hue + '40',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: hue }} />
+            </View>
+            <View>
+              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15.5, color: t.ink, lineHeight: 18 }}>
+                Someone listening
+              </Text>
+              <Text style={{ fontSize: 10.5, color: t.ink3, marginTop: 1, letterSpacing: 0.3 }}>
+                {tp.label} · {untimed ? 'No timer' : formatTime(timeLeft)}
+              </Text>
+            </View>
           </View>
+
+          {/* Report button */}
+          <TouchableOpacity
+            onPress={() => setReportOpen(true)}
+            style={{
+              minWidth: 44, height: 44, paddingHorizontal: 12, borderRadius: 12,
+              backgroundColor: t.redDim, borderWidth: 0.5, borderColor: t.red + '40',
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+            }}
+          >
+            <Text style={{ fontSize: 12.5, fontWeight: '500', color: t.red }}>Report</Text>
+          </TouchableOpacity>
+
+          {/* Exit button */}
+          <TouchableOpacity
+            onPress={() => setExitOpen(true)}
+            style={{
+              minWidth: 44, height: 44, paddingHorizontal: 12, borderRadius: 12,
+              backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line,
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+            }}
+          >
+            <Text style={{ fontSize: 12.5, fontWeight: '500', color: t.ink }}>Exit</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Soft-end banner */}
-        {isExpired && (
-          <View style={{ marginHorizontal: 16, marginTop: 8, borderRadius: 12, backgroundColor: t.elevated, borderWidth: 1, borderColor: t.border, padding: 14, alignItems: 'center', gap: 12 }}>
-            <Text style={{ fontFamily: 'Georgia', fontSize: 14, color: t.foreground, textAlign: 'center', lineHeight: 20 }}>
-              Your session time is up. You can keep talking or wrap up.
+        {/* Progress bar */}
+        {!untimed && (
+          <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flex: 1, height: 2, borderRadius: 99, backgroundColor: t.bg3, overflow: 'hidden' }}>
+              <View style={{
+                height: '100%',
+                width: `${(timeLeft / SESSION_DURATION_SECONDS) * 100}%`,
+                backgroundColor: isWarning ? t.red : hue,
+              }} />
+            </View>
+            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 10.5, color: t.ink4 }}>
+              {isWarning ? 'ending soon' : 'session time'}
             </Text>
-            <TouchableOpacity
-              onPress={handleSessionEnd}
-              style={{ paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999, backgroundColor: t.destructive }}
-            >
-              <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>End Session</Text>
-            </TouchableOpacity>
+          </View>
+        )}
+
+        {untimed && (
+          <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: hue }} />
+            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 11, color: t.ink3, letterSpacing: 0.1 }}>
+              Both of you chose to keep talking — no timer
+            </Text>
+          </View>
+        )}
+
+        {/* Context note */}
+        {!!specific && (
+          <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+            <View style={{ padding: 10, backgroundColor: t.bg2, borderRadius: 14, borderWidth: 0.5, borderColor: t.line }}>
+              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 12, color: t.ink3 }}>
+                You wrote: "{specific}"
+              </Text>
+            </View>
           </View>
         )}
 
         {/* Messages */}
         <ScrollView
           ref={scrollRef}
-          style={{ flex: 1, paddingHorizontal: 16, paddingTop: 12 }}
+          style={{ flex: 1, paddingHorizontal: 16, paddingTop: 8 }}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
         >
-          {messages.map((m, idx) => {
+          {messages.map((m) => {
             const mine = m.from === 'me';
-            const prev = messages[idx - 1];
-            const grouped = prev && prev.from === m.from;
             return (
-              <View key={m.id} style={[{ alignItems: mine ? 'flex-end' : 'flex-start' }, !grouped && { marginTop: 12 }]}>
-                <View style={[
-                  { maxWidth: '80%', paddingHorizontal: 14, paddingVertical: 10 },
-                  mine
-                    ? { backgroundColor: t.primary, borderRadius: 16, borderBottomRightRadius: 4 }
-                    : { backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 16, borderBottomLeftRadius: 4 },
-                ]}>
-                  <Text style={{ fontSize: 15, lineHeight: 22, color: mine ? t.primaryForeground : t.foreground }}>
-                    {m.text}
-                  </Text>
+              <View key={m.id} style={{ alignItems: mine ? 'flex-end' : 'flex-start', marginBottom: 14 }}>
+                <View style={{
+                  maxWidth: '78%', paddingHorizontal: 15, paddingVertical: 11,
+                  borderRadius: mine ? 20 : 20,
+                  borderBottomRightRadius: mine ? 6 : 20,
+                  borderBottomLeftRadius: mine ? 20 : 6,
+                  backgroundColor: mine ? hue + '28' : t.bg3,
+                  borderWidth: 0.5, borderColor: mine ? hue + '40' : t.line,
+                }}>
+                  <Text style={{ fontSize: 15, lineHeight: 21, color: t.ink, letterSpacing: -0.1 }}>{m.text}</Text>
                 </View>
-                <Text style={{ marginTop: 4, paddingHorizontal: 4, fontSize: 10.5, color: t.mutedForeground }}>{m.time}</Text>
+                <Text style={{ fontSize: 10, color: t.ink4, paddingHorizontal: 6, marginTop: 3, letterSpacing: 0.2 }}>{m.time}</Text>
               </View>
             );
           })}
+
+          {typing && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingLeft: 4, marginBottom: 14 }}>
+              {[0, 1, 2].map(i => (
+                <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.ink3, opacity: 0.6 }} />
+              ))}
+              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 11, color: t.ink4, marginLeft: 4 }}>
+                They're thinking
+              </Text>
+            </View>
+          )}
           <View style={{ height: 12 }} />
         </ScrollView>
 
         {/* Composer */}
-        <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 20, borderTopWidth: 1, borderTopColor: t.border }}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, backgroundColor: t.surface, borderColor: t.border }}>
+        <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 20, borderTopWidth: 0.5, borderTopColor: t.line }}>
+          <View style={{
+            flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+            backgroundColor: t.bg3, borderRadius: 22, paddingLeft: 16,
+            paddingRight: 6, paddingVertical: 6, borderWidth: 0.5, borderColor: t.line,
+          }}>
             <TextInput
               value={draft}
               onChangeText={setDraft}
               onSubmitEditing={send}
-              placeholder="Message…"
-              placeholderTextColor={t.mutedForeground}
+              placeholder="Say anything…"
+              placeholderTextColor={t.ink4}
               returnKeyType="send"
               multiline
-              style={{ flex: 1, fontSize: 15, color: t.foreground, paddingVertical: 6, maxHeight: 120 }}
+              style={{ flex: 1, fontSize: 15, color: t.ink, paddingVertical: 8, maxHeight: 100, letterSpacing: -0.1 }}
             />
             <TouchableOpacity
               onPress={send}
               disabled={!draft.trim()}
-              style={{ height: 32, width: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0, backgroundColor: draft.trim() ? t.primary : t.muted }}
+              style={{
+                width: 34, height: 34, borderRadius: 17,
+                backgroundColor: draft.trim() ? hue : t.bg4,
+                alignItems: 'center', justifyContent: 'center',
+              }}
             >
-              <ArrowUp size={16} color={draft.trim() ? t.primaryForeground : t.mutedForeground} strokeWidth={2.5} />
+              <Text style={{ fontSize: 16, color: draft.trim() ? t.bg : t.ink4 }}>↑</Text>
             </TouchableOpacity>
           </View>
-          <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 10.5, color: t.mutedForeground }}>
-            End-to-end encrypted · Anonymous
+          <Text style={{ marginTop: 10, textAlign: 'center', fontSize: 10, color: t.ink5, letterSpacing: 0.5 }}>
+            END-TO-END ENCRYPTED · NOT RECORDED
           </Text>
         </View>
       </KeyboardAvoidingView>
 
-      {/* Report modal */}
-      <Modal visible={reportVisible} transparent animationType="fade" onRequestClose={() => setReportVisible(false)}>
-        <TouchableOpacity
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
-          activeOpacity={1}
-          onPress={() => setReportVisible(false)}
-        >
-          <View style={{ backgroundColor: t.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 36, gap: 12 }}>
-            <Text style={{ fontFamily: 'Georgia', fontSize: 16, fontWeight: '600', color: t.foreground, textAlign: 'center', marginBottom: 4 }}>
-              Report this user?
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                setReportVisible(false);
-                Alert.alert('Reported', 'Thank you. Our team will review this session.');
-              }}
-              style={{ paddingVertical: 16, borderRadius: 12, backgroundColor: `${t.destructive}18`, alignItems: 'center' }}
-            >
-              <Text style={{ fontSize: 16, fontWeight: '600', color: t.destructive }}>Report User</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setReportVisible(false)}
-              style={{ paddingVertical: 16, borderRadius: 12, backgroundColor: t.muted, alignItems: 'center' }}
-            >
-              <Text style={{ fontSize: 16, fontWeight: '500', color: t.foreground }}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      {reportOpen && <ReportSheet onClose={() => setReportOpen(false)} onConfirm={goToRating} />}
+      {exitOpen && <ExitSheet onClose={() => setExitOpen(false)} onConfirm={goToRating} />}
+      {continueOpen && (
+        <ContinueSheet
+          youAgreed={youAgreed}
+          theyAgreed={theyAgreed}
+          onAgree={() => setYouAgreed(true)}
+          onDecline={goToRating}
+        />
+      )}
     </SafeAreaView>
   );
 }

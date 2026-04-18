@@ -1,8 +1,9 @@
 import { BottomNav } from '@/components/BottomNav';
 import { useTheme } from '@/hooks/useTheme';
+import { useRouter } from 'expo-router';
 import {
-  Award, Bell, ChevronRight, Clock, HelpCircle,
-  LogOut, MessageCircle, MessageSquare, Moon, Shield, Star, User,
+  Bell, ChevronRight, HelpCircle,
+  LogOut, MessageSquare, Moon, Shield,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -31,6 +32,7 @@ const MENU: MenuSection[] = [
 
 export default function ProfileScreen() {
   const t = useTheme();
+  const router = useRouter();
 
   function Row({ icon: Icon, label, value, destructive = false }: MenuItem) {
     return (
@@ -38,85 +40,102 @@ export default function ProfileScreen() {
         style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 }}
         activeOpacity={0.7}
       >
-        <View style={{ height: 32, width: 32, borderRadius: 8, backgroundColor: destructive ? `${t.destructive}1A` : t.muted, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={16} color={destructive ? t.destructive : t.foreground} strokeWidth={2} style={{ opacity: destructive ? 1 : 0.7 }} />
+        <View style={{
+          height: 32, width: 32, borderRadius: 8,
+          backgroundColor: destructive ? t.red + '1A' : t.bg4,
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon size={16} color={destructive ? t.red : t.ink3} strokeWidth={2} />
         </View>
-        <Text style={{ flex: 1, fontSize: 14.5, fontWeight: '500', color: destructive ? t.destructive : t.foreground }}>
+        <Text style={{ flex: 1, fontSize: 14.5, fontWeight: '500', color: destructive ? t.red : t.ink }}>
           {label}
         </Text>
-        {value ? <Text style={{ fontSize: 13, color: t.mutedForeground }}>{value}</Text> : null}
-        <ChevronRight size={16} color={t.mutedForeground} style={{ opacity: 0.6 }} />
+        {value ? <Text style={{ fontSize: 13, color: t.ink4 }}>{value}</Text> : null}
+        <ChevronRight size={16} color={t.ink4} style={{ opacity: 0.6 }} />
       </TouchableOpacity>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
 
         {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 48, paddingBottom: 20 }}>
-          <Text style={{ fontSize: 12, letterSpacing: 1.4, color: t.mutedForeground, fontWeight: '500', textTransform: 'uppercase' }}>
+        <View style={{ paddingHorizontal: 28, paddingTop: 48, paddingBottom: 20 }}>
+          <Text style={{ fontSize: 11, letterSpacing: 2.2, color: t.ink4, textTransform: 'uppercase', marginBottom: 14 }}>
             Account
           </Text>
-          <Text style={{ fontFamily: 'Georgia', fontSize: 34, lineHeight: 38, fontWeight: '600', color: t.foreground, marginTop: 4 }}>
-            Profile
+          <Text style={{ fontFamily: 'Georgia', fontSize: 40, lineHeight: 44, letterSpacing: -0.8, color: t.ink }}>
+            You
           </Text>
+        </View>
+
+        {/* Listen tonight — promoted to top */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+          <TouchableOpacity
+            onPress={() => router.push('/listener' as never)}
+            style={{
+              borderRadius: 16, padding: 18,
+              backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.coral + '50',
+              flexDirection: 'row', alignItems: 'center', gap: 14,
+            }}
+            activeOpacity={0.85}
+          >
+            <View style={{
+              width: 44, height: 44, borderRadius: 12,
+              backgroundColor: t.coral + '18', borderWidth: 0.5, borderColor: t.coral + '44',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.coral }} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '500', color: t.coral }}>Listen to someone tonight</Text>
+              <Text style={{ fontSize: 12.5, color: t.ink3, marginTop: 2 }}>Help out · 10–15 min each</Text>
+            </View>
+            <ChevronRight size={16} color={t.ink4} style={{ opacity: 0.6 }} />
+          </TouchableOpacity>
         </View>
 
         {/* Identity card */}
         <View style={{ paddingHorizontal: 20 }}>
-          <View style={{ borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, padding: 20, alignItems: 'center' }}>
-            <View style={{ height: 80, width: 80, borderRadius: 40, backgroundColor: t.primarySoft, borderWidth: 1, borderColor: t.primary + '26', alignItems: 'center', justifyContent: 'center' }}>
-              <User size={36} color={t.primary} strokeWidth={1.6} />
+          <View style={{
+            borderRadius: 16, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line,
+            padding: 20, alignItems: 'center',
+          }}>
+            <View style={{
+              height: 72, width: 72, borderRadius: 36,
+              backgroundColor: t.bg4, borderWidth: 0.5, borderColor: t.lineStrong,
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 24, color: t.ink3 }}>A</Text>
             </View>
-            <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: t.foreground, marginTop: 12 }}>
+            <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: t.ink, marginTop: 12 }}>
               Anonymous User
             </Text>
-            <Text style={{ fontSize: 12.5, color: t.mutedForeground, marginTop: 2 }}>Member since March 2024</Text>
-
+            <Text style={{ fontSize: 12.5, color: t.ink4, marginTop: 2 }}>Member since March 2024</Text>
             <View style={{ marginTop: 20, flexDirection: 'row', width: '100%' }}>
-              {[
-                { Icon: MessageCircle, value: '12', label: 'Chats' },
-                { Icon: Clock, value: '5h', label: 'Listened' },
-                { Icon: Star, value: '4.2', label: 'Rating' },
-              ].map(({ Icon, value, label }, i) => (
-                <View key={label} style={[{ flex: 1, alignItems: 'center' }, i > 0 ? { borderLeftWidth: 1, borderLeftColor: t.border } : undefined]}>
-                  <Icon size={14} color={t.primary} style={{ marginBottom: 6 }} />
-                  <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: t.foreground, lineHeight: 22 }}>{value}</Text>
-                  <Text style={{ marginTop: 4, fontSize: 11, color: t.mutedForeground }}>{label}</Text>
+              {[{ v: '12', l: 'Chats' }, { v: '5h', l: 'Listened' }, { v: '4.2', l: 'Rating' }].map(({ v, l }, i) => (
+                <View key={l} style={[
+                  { flex: 1, alignItems: 'center' },
+                  i > 0 ? { borderLeftWidth: 0.5, borderLeftColor: t.line } : undefined,
+                ]}>
+                  <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: t.ink, lineHeight: 22 }}>{v}</Text>
+                  <Text style={{ marginTop: 4, fontSize: 11, color: t.ink4 }}>{l}</Text>
                 </View>
               ))}
             </View>
           </View>
         </View>
 
-        {/* Badge */}
-        <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
-          <TouchableOpacity
-            style={{ borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: t.primary }}
-            activeOpacity={0.85}
-          >
-            <View style={{ height: 44, width: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Award size={20} color={t.primaryForeground} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: 'Georgia', fontSize: 16, fontWeight: '600', color: t.primaryForeground, lineHeight: 20 }}>First Steps</Text>
-              <Text style={{ fontSize: 12.5, color: t.primaryForeground, opacity: 0.75 }}>Completed 10+ sessions</Text>
-            </View>
-            <ChevronRight size={16} color={t.primaryForeground} style={{ opacity: 0.6 }} />
-          </TouchableOpacity>
-        </View>
-
         {/* Menu sections */}
         {MENU.map((section) => (
           <View key={section.section} style={{ paddingHorizontal: 20, marginTop: 28 }}>
-            <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 1.4, color: t.mutedForeground, textTransform: 'uppercase', marginBottom: 8, paddingHorizontal: 4 }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 1.4, color: t.ink4, textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>
               {section.section}
             </Text>
-            <View style={{ borderRadius: 12, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, overflow: 'hidden' }}>
+            <View style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, overflow: 'hidden' }}>
               {section.items.map((item, i) => (
-                <View key={item.label} style={i < section.items.length - 1 ? { borderBottomWidth: 1, borderBottomColor: t.border } : undefined}>
+                <View key={item.label} style={i < section.items.length - 1 ? { borderBottomWidth: 0.5, borderBottomColor: t.line } : undefined}>
                   <Row {...item} />
                 </View>
               ))}
@@ -126,16 +145,16 @@ export default function ProfileScreen() {
 
         {/* Sign out */}
         <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
-          <View style={{ borderRadius: 12, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, overflow: 'hidden' }}>
+          <View style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, overflow: 'hidden' }}>
             <Row icon={LogOut} label="Sign out" destructive />
           </View>
-          <Text style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: t.mutedForeground }}>
+          <Text style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: t.ink4 }}>
             Talkd · v1.0.0
           </Text>
         </View>
       </ScrollView>
 
-      <BottomNav active="Profile" />
+      <BottomNav active="You" />
     </SafeAreaView>
   );
 }

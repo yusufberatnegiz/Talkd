@@ -1,52 +1,49 @@
-import { useTheme } from '@/hooks/useTheme';
+import { theme } from '@/lib/theme';
 import { useRouter } from 'expo-router';
-import { Clock, Home, User } from 'lucide-react-native';
 import { Text, TouchableOpacity, View } from 'react-native';
 
-type Tab = 'Home' | 'History' | 'Profile';
+export type Tab = 'Talk' | 'History' | 'You';
 
-const TABS: { label: Tab; Icon: typeof Home; route: string }[] = [
-  { label: 'Home', Icon: Home, route: '/(tabs)' },
-  { label: 'History', Icon: Clock, route: '/(tabs)/history' },
-  { label: 'Profile', Icon: User, route: '/(tabs)/profile' },
+const TABS: { label: Tab; route: string }[] = [
+  { label: 'Talk', route: '/(tabs)' },
+  { label: 'History', route: '/(tabs)/history' },
+  { label: 'You', route: '/(tabs)/profile' },
 ];
 
 export function BottomNav({ active }: { active: Tab }) {
   const router = useRouter();
-  const t = useTheme();
+  const t = theme;
 
   return (
-    <View style={{ paddingHorizontal: 16, paddingBottom: 20, paddingTop: 8 }}>
-      <View
-        style={{
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: t.border,
-          backgroundColor: t.surface,
-          flexDirection: 'row',
-          alignItems: 'center',
-        }}
-      >
-        {TABS.map(({ label, Icon, route }) => {
+    <View style={{ paddingHorizontal: 16, paddingBottom: 30, paddingTop: 10 }}>
+      <View style={{
+        borderRadius: 99,
+        borderWidth: 0.5,
+        borderColor: t.line,
+        backgroundColor: t.bg3,
+        flexDirection: 'row',
+        padding: 4,
+      }}>
+        {TABS.map(({ label, route }) => {
           const isActive = label === active;
           return (
             <TouchableOpacity
               key={label}
               onPress={() => router.push(route as never)}
-              style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 4 }}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                paddingVertical: 12,
+                backgroundColor: isActive ? t.bg4 : 'transparent',
+                borderRadius: 99,
+              }}
             >
-              <Icon
-                size={22}
-                color={isActive ? t.primary : t.mutedForeground}
-                strokeWidth={isActive ? 2.2 : 1.7}
-              />
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: isActive ? '600' : '500',
-                  color: isActive ? t.primary : t.mutedForeground,
-                }}
-              >
+              <Text style={{
+                fontSize: 13,
+                fontWeight: '500',
+                color: isActive ? t.ink : t.ink3,
+                letterSpacing: -0.1,
+              }}>
                 {label}
               </Text>
             </TouchableOpacity>

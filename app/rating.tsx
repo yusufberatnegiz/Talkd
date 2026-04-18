@@ -1,157 +1,152 @@
+import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
-import { useRouter } from 'expo-router';
-import { CheckCircle2, Star } from 'lucide-react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const POSITIVE_LABELS = [
-  'Great listener',
-  'Empathetic',
-  'Helpful advice',
-  'Non-judgmental',
-  'Made me feel better',
-  'Patient',
-  'Understanding',
-  'Supportive',
-] as const;
-
-const NEGATIVE_LABELS = [
-  'Unresponsive',
-  'Rude or dismissive',
-  'Unhelpful advice',
-  'Judgmental',
-  'Made me feel worse',
-  'Impatient',
-  "Didn't understand",
-  'Disconnected early',
+const LISTENER_BADGES = [
+  { k: 'listener',   label: 'Good Listener', color: '#9AB39C' },
+  { k: 'calm',       label: 'Calm',          color: '#B5A8D9' },
+  { k: 'supportive', label: 'Supportive',    color: '#E8B57A' },
+  { k: 'present',    label: 'Present',       color: '#E89A8A' },
 ] as const;
 
 export default function RatingScreen() {
   const t = useTheme();
-  const router = useRouter();
-  const [rating, setRating] = useState(0);
-  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  const { topic: topicParam } = useLocalSearchParams<{ topic?: string }>();
+  const tp = getTopic(topicParam ?? 'any');
+
+  const [stars, setStars] = useState(0);
+  const [hoverStars] = useState(0);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [note, setNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  const toggleLabel = (label: string) => {
-    setSelectedLabels((prev) =>
-      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
-    );
-  };
-
-  const handleRatingChange = (newRating: number) => {
-    const wasPositive = rating >= 3;
-    const isPositive = newRating >= 3;
-    if (rating > 0 && wasPositive !== isPositive) setSelectedLabels([]);
-    setRating(newRating);
-  };
+  const displayStars = hoverStars || stars;
 
   if (submitted) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: t.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: t.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-          <CheckCircle2 size={40} color={t.primary} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: tp.hue + '22', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+          <Text style={{ fontSize: 36 }}>✓</Text>
         </View>
-        <Text style={{ fontFamily: 'Georgia', fontSize: 22, fontWeight: '600', color: t.foreground, textAlign: 'center', marginBottom: 8 }}>
-          Thank you
+        <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 30, color: t.ink, textAlign: 'center', marginBottom: 8 }}>
+          Thank you.
         </Text>
-        <Text style={{ fontSize: 14, color: t.mutedForeground, textAlign: 'center', lineHeight: 22 }}>
-          Your feedback helps us improve the experience for everyone.
+        <Text style={{ fontSize: 14, color: t.ink3, textAlign: 'center', lineHeight: 22 }}>
+          Your feedback helps good people stay on talkd.
         </Text>
       </SafeAreaView>
     );
   }
 
-  const labels = rating >= 3 ? POSITIVE_LABELS : NEGATIVE_LABELS;
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
       <ScrollView
         style={{ flex: 1, paddingHorizontal: 20 }}
-        contentContainerStyle={{ paddingTop: 32, paddingBottom: 24 }}
+        contentContainerStyle={{ paddingTop: 28, paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Session complete banner */}
-        <View style={{ borderRadius: 16, padding: 20, marginBottom: 32, alignItems: 'center', backgroundColor: t.elevated, borderWidth: 1, borderColor: t.border }}>
-          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: t.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-            <CheckCircle2 size={24} color={t.primary} />
-          </View>
-          <Text style={{ fontFamily: 'Georgia', fontSize: 17, fontWeight: '600', color: t.foreground }}>Session Complete</Text>
-          <Text style={{ fontSize: 13, color: t.mutedForeground, marginTop: 4 }}>Duration: 15 minutes</Text>
-        </View>
-
-        {/* Prompt */}
-        <View style={{ alignItems: 'center', marginBottom: 24 }}>
-          <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: t.foreground, marginBottom: 6 }}>
-            How was your experience?
+        {/* Header */}
+        <View style={{ paddingHorizontal: 8, paddingBottom: 16 }}>
+          <Text style={{ fontSize: 11, letterSpacing: 2.2, color: t.ink4, textTransform: 'uppercase', marginBottom: 14 }}>
+            Conversation ended
           </Text>
-          <Text style={{ fontSize: 13.5, color: t.mutedForeground }}>
-            Rate your conversation with your listener
+          <Text style={{ fontFamily: 'Georgia', fontSize: 38, lineHeight: 42, letterSpacing: -0.6, color: t.ink }}>
+            {'How was '}
+            <Text style={{ fontStyle: 'italic', color: tp.hue }}>it?</Text>
+          </Text>
+          <Text style={{ fontSize: 13, color: t.ink3, marginTop: 10, lineHeight: 19 }}>
+            Rate the listener and pick one badge. Your rating stays anonymous — it just helps good people stay on talkd.
           </Text>
         </View>
 
         {/* Stars */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 32 }}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <TouchableOpacity key={star} onPress={() => handleRatingChange(star)} style={{ padding: 4 }} activeOpacity={0.7}>
-              <Star
-                size={40}
-                color={star <= rating ? t.primary : t.border}
-                fill={star <= rating ? t.primary : 'transparent'}
-              />
-            </TouchableOpacity>
-          ))}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 20 }}>
+          {[1, 2, 3, 4, 5].map(n => {
+            const active = displayStars >= n;
+            return (
+              <TouchableOpacity
+                key={n}
+                onPress={() => setStars(n)}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 34, opacity: active ? 1 : 0.25 }}>
+                  {active ? '★' : '☆'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={{
+          textAlign: 'center', fontSize: 11, color: tp.hue,
+          letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 28,
+        }}>
+          {stars === 0 ? 'Tap to rate' : stars === 1 ? 'Not great' : stars === 2 ? 'Okay' : stars === 3 ? 'Good' : stars === 4 ? 'Really helpful' : 'The best'}
+        </Text>
+
+        {/* Badge */}
+        <Text style={{ fontSize: 11, letterSpacing: 1.8, color: t.ink4, textTransform: 'uppercase', marginBottom: 10, paddingLeft: 4 }}>
+          Pick one badge
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 24 }}>
+          {LISTENER_BADGES.map(b => {
+            const active = picked === b.k;
+            return (
+              <TouchableOpacity
+                key={b.k}
+                onPress={() => setPicked(b.k)}
+                style={{
+                  width: '48%', padding: 14, borderRadius: 14,
+                  backgroundColor: active ? b.color + '20' : t.bg3,
+                  borderWidth: active ? 1 : 0.5,
+                  borderColor: active ? b.color + '70' : t.line,
+                  flexDirection: 'row', alignItems: 'center', gap: 10,
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: b.color }} />
+                <Text style={{ fontFamily: 'Georgia', fontSize: 16, letterSpacing: -0.1, color: active ? b.color : t.ink }}>
+                  {b.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Label chips */}
-        {rating > 0 && (
-          <View style={{ marginBottom: 24 }}>
-            <Text style={{ fontSize: 13, color: t.mutedForeground, marginBottom: 12, textAlign: 'center' }}>
-              {rating >= 3 ? 'What made this session great?' : 'What went wrong with this session?'}
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
-              {labels.map((label) => {
-                const isSelected = selectedLabels.includes(label);
-                const selectedBg = rating >= 3 ? t.primary : t.destructive;
-                return (
-                  <TouchableOpacity
-                    key={label}
-                    onPress={() => toggleLabel(label)}
-                    style={{
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 999,
-                      backgroundColor: isSelected ? selectedBg : t.muted,
-                      borderWidth: 1,
-                      borderColor: isSelected ? selectedBg : t.border,
-                    }}
-                  >
-                    <Text style={{ fontSize: 12.5, fontWeight: '500', color: isSelected ? '#fff' : t.mutedForeground }}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
+        {/* Private note */}
+        <Text style={{ fontSize: 11, letterSpacing: 1.8, color: t.ink4, textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>
+          Note for yourself (private)
+        </Text>
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          placeholder="What do you want to remember…"
+          placeholderTextColor={t.ink4}
+          multiline
+          style={{
+            minHeight: 64, padding: 14, borderRadius: 14,
+            backgroundColor: t.bg2, borderWidth: 0.5, borderColor: t.line,
+            color: t.ink, fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 14,
+            textAlignVertical: 'top', marginBottom: 24,
+          }}
+        />
 
         {/* Submit */}
         <TouchableOpacity
           onPress={() => setSubmitted(true)}
-          disabled={rating === 0}
-          style={{ paddingVertical: 16, borderRadius: 14, alignItems: 'center', backgroundColor: rating > 0 ? t.primary : t.muted }}
+          style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: t.amber }}
+          activeOpacity={0.85}
         >
-          <Text style={{ fontSize: 15, fontWeight: '600', color: rating > 0 ? t.primaryForeground : t.mutedForeground }}>
-            Submit Feedback
+          <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.bg, letterSpacing: -0.1 }}>
+            {stars || picked ? 'Send & close' : 'Skip & close'}
           </Text>
         </TouchableOpacity>
-
-        {/* Skip */}
-        <TouchableOpacity style={{ marginTop: 12, alignItems: 'center' }} onPress={() => router.back()}>
-          <Text style={{ fontSize: 13.5, color: t.mutedForeground }}>Skip for now</Text>
-        </TouchableOpacity>
+        <Text style={{ textAlign: 'center', fontSize: 10.5, color: t.ink5, marginTop: 10, letterSpacing: 0.4 }}>
+          THEY'RE RATING YOU TOO. NEITHER OF YOU SEES THE OTHER'S RATING.
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );

@@ -201,7 +201,7 @@ export default function ChatScreen() {
   const [continueOpen, setContinueOpen] = useState(false);
   const [youAgreed, setYouAgreed] = useState(false);
   const [theyAgreed, setTheyAgreed] = useState(false);
-  const [typing, setTyping] = useState(false);
+  const [typing] = useState(false);
 
   function formatClock() {
     const d = new Date();
@@ -246,16 +246,6 @@ export default function ChatScreen() {
     if (!text) return;
     setMessages(prev => [...prev, { id: Date.now(), from: 'me', text, time: formatClock() }]);
     setDraft('');
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        from: 'them',
-        text: "That sounds like a lot. What's weighing on you most?",
-        time: formatClock(),
-      }]);
-    }, 2200);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
 

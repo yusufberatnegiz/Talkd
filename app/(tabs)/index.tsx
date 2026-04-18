@@ -1,8 +1,8 @@
 import { BottomNav } from '@/components/BottomNav';
 import { TOPICS } from '@/constants/topics';
+import { useOnlineCount } from '@/hooks/useOnlineCount';
 import { useTheme } from '@/hooks/useTheme';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,14 +13,7 @@ function Dot({ size = 6, color }: { size?: number; color: string }) {
 export default function HomeScreen() {
   const t = useTheme();
   const router = useRouter();
-  const [listeners, setListeners] = useState(107);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setListeners(n => Math.max(82, Math.min(128, n + Math.floor(Math.random() * 7) - 3)));
-    }, 3500);
-    return () => clearInterval(id);
-  }, []);
+  const { total, byTopic } = useOnlineCount();
 
   const topicsArr = Object.values(TOPICS);
 
@@ -41,7 +34,7 @@ export default function HomeScreen() {
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Dot size={6} color={t.amber} />
-            <Text style={{ fontSize: 12, color: t.ink3, letterSpacing: 0.4 }}>{listeners} online now</Text>
+            <Text style={{ fontSize: 12, color: t.ink3, letterSpacing: 0.4 }}>{total ?? '…'} online now</Text>
           </View>
         </View>
 
@@ -78,7 +71,7 @@ export default function HomeScreen() {
                 <Dot size={7} color={tp.hue} />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Dot size={4} color={tp.hue} />
-                  <Text style={{ fontSize: 10.5, color: tp.hue, letterSpacing: 0.3 }}>{tp.n}</Text>
+                  <Text style={{ fontSize: 10.5, color: tp.hue, letterSpacing: 0.3 }}>{byTopic[tp.key] ?? '…'}</Text>
                 </View>
               </View>
               <View>

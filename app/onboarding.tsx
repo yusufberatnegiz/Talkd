@@ -221,7 +221,7 @@ export default function OnboardingScreen() {
           </TouchableOpacity>
         )}
         <TouchableOpacity
-          onPress={() => isLast ? router.replace('/(tabs)') : setStep(step + 1)}
+          onPress={() => isLast ? router.replace('/auth' as never) : setStep(step + 1)}
           style={{ flex: 1, paddingVertical: 16, backgroundColor: t.amber, borderRadius: 99, alignItems: 'center' }}
           activeOpacity={0.85}
         >

@@ -1,19 +1,25 @@
 import { BottomNav } from '@/components/BottomNav';
-import { TOPICS } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useUserStats } from '@/hooks/useUserStats';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const SESSIONS = [
-  { topic: 'mh',     when: 'Today',     duration: '24 min', rating: 5 },
-  { topic: 'rel',    when: 'Yesterday', duration: '18 min', rating: 4 },
-  { topic: 'advice', when: 'Mar 15',    duration: '32 min', rating: 5 },
-  { topic: 'mh',     when: 'Mar 12',    duration: '15 min', rating: 3 },
-  { topic: 'rel',    when: 'Mar 10',    duration: '28 min', rating: 5 },
-] as const;
+function formatTime(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const h = minutes / 60;
+  return Number.isInteger(h) ? `${h}h` : `${h.toFixed(1)}h`;
+}
 
 export default function HistoryScreen() {
   const t = useTheme();
+  const { stats, loading } = useUserStats();
+
+  const dash = '—';
+  const statRows = [
+    { v: loading ? dash : String(stats.sessions), l: 'Sessions' },
+    { v: loading ? dash : stats.avgRating !== null ? String(stats.avgRating) : dash, l: 'Avg rating' },
+    { v: loading ? dash : formatTime(stats.totalMinutes), l: 'Total time' },
+  ];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
@@ -37,7 +43,7 @@ export default function HistoryScreen() {
               <Text style={{ fontSize: 11, letterSpacing: 1.5, color: t.ink4, textTransform: 'uppercase' }}>Last 30 days</Text>
             </View>
             <View style={{ flexDirection: 'row' }}>
-              {[{ v: '12', l: 'Sessions' }, { v: '4.2', l: 'Avg rating' }, { v: '5h', l: 'Total time' }].map((s, i) => (
+              {statRows.map((s, i) => (
                 <View
                   key={s.l}
                   style={[
@@ -55,50 +61,11 @@ export default function HistoryScreen() {
           </View>
         </View>
 
-        {/* Sessions list */}
-        <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
-          <Text style={{ fontFamily: 'Georgia', fontSize: 15, color: t.ink, marginBottom: 12 }}>
-            Conversations
+        {/* Empty state */}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 }}>
+          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: t.ink4, textAlign: 'center' }}>
+            Your conversations will appear here.
           </Text>
-          <View style={{ borderRadius: 16, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, overflow: 'hidden' }}>
-            {SESSIONS.map((s, i) => {
-              const tp = TOPICS[s.topic as keyof typeof TOPICS] ?? TOPICS.any;
-              return (
-                <TouchableOpacity
-                  key={i}
-                  style={[
-                    { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
-                    i < SESSIONS.length - 1 ? { borderBottomWidth: 0.5, borderBottomColor: t.line } : undefined,
-                  ]}
-                  activeOpacity={0.7}
-                >
-                  {/* Topic dot */}
-                  <View style={{
-                    width: 40, height: 40, borderRadius: 12,
-                    backgroundColor: tp.hue + '18', borderWidth: 0.5, borderColor: tp.hue + '40',
-                    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: tp.hue }} />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <Text style={{ fontFamily: 'Georgia', fontSize: 15, color: t.ink }}>{tp.label}</Text>
-                      {/* Stars */}
-                      <Text style={{ fontSize: 13, color: tp.hue, letterSpacing: 1 }}>
-                        {'★'.repeat(s.rating)}{'☆'.repeat(5 - s.rating)}
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <Text style={{ fontSize: 11.5, color: t.ink3 }}>{s.when}</Text>
-                      <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: t.ink4 }} />
-                      <Text style={{ fontSize: 11.5, color: t.ink3 }}>{s.duration}</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
         </View>
       </ScrollView>
 

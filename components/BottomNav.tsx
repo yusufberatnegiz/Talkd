@@ -1,6 +1,7 @@
 import { theme } from '@/lib/theme';
 import { useRouter } from 'expo-router';
 import { Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type Tab = 'Talk' | 'History' | 'You';
 
@@ -13,9 +14,10 @@ const TABS: { label: Tab; route: string }[] = [
 export function BottomNav({ active }: { active: Tab }) {
   const router = useRouter();
   const t = theme;
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ paddingHorizontal: 16, paddingBottom: 30, paddingTop: 10 }}>
+    <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8) }}>
       <View style={{
         borderRadius: 99,
         borderWidth: 0.5,

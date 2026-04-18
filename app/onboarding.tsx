@@ -1,58 +1,140 @@
 import { TOPICS } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// Visual 1 — two glowing circles drifting toward each other
 function Visual1() {
   const t = useTheme();
+  const leftX = useRef(new Animated.Value(-28)).current;
+  const rightX = useRef(new Animated.Value(28)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(leftX, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(rightX, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(leftX, { toValue: -28, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(rightX, { toValue: 28, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]),
+      ])
+    ).start();
+  }, []);
+
   return (
-    <View style={{ width: 220, height: 180, alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-      <View style={{
-        position: 'absolute', left: 20, width: 70, height: 70, borderRadius: 35,
-        backgroundColor: t.amber, opacity: 0.25,
+    <View style={{ width: 240, height: 180, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Outer glow circles */}
+      <Animated.View style={{
+        position: 'absolute', width: 80, height: 80, borderRadius: 40,
+        backgroundColor: t.amber, opacity: 0.18,
+        transform: [{ translateX: leftX }],
+        left: 20,
       }} />
-      <View style={{
-        position: 'absolute', right: 20, width: 70, height: 70, borderRadius: 35,
-        backgroundColor: t.coral, opacity: 0.25,
+      <Animated.View style={{
+        position: 'absolute', width: 80, height: 80, borderRadius: 40,
+        backgroundColor: t.coral, opacity: 0.18,
+        transform: [{ translateX: rightX }],
+        right: 20,
       }} />
+      {/* Connection line */}
       <View style={{ width: 80, height: 0.5, backgroundColor: t.lineStrong }} />
-      <View style={{ position: 'absolute', left: 55, width: 46, height: 46, borderRadius: 23, backgroundColor: t.amber, opacity: 0.6 }} />
-      <View style={{ position: 'absolute', right: 55, width: 46, height: 46, borderRadius: 23, backgroundColor: t.coral, opacity: 0.6 }} />
+      {/* Inner solid circles */}
+      <Animated.View style={{
+        position: 'absolute', width: 48, height: 48, borderRadius: 24,
+        backgroundColor: t.amber, opacity: 0.65,
+        transform: [{ translateX: leftX }],
+        left: 46,
+      }} />
+      <Animated.View style={{
+        position: 'absolute', width: 48, height: 48, borderRadius: 24,
+        backgroundColor: t.coral, opacity: 0.65,
+        transform: [{ translateX: rightX }],
+        right: 46,
+      }} />
     </View>
   );
 }
 
+// Visual 2 — topic chips stagger fade-in
 function Visual2() {
   const chips = Object.values(TOPICS).slice(0, 5);
+  const opacities = useRef(chips.map(() => new Animated.Value(0))).current;
+  const translates = useRef(chips.map(() => new Animated.Value(10))).current;
+
+  useEffect(() => {
+    Animated.stagger(
+      120,
+      chips.map((_, i) =>
+        Animated.parallel([
+          Animated.timing(opacities[i], { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(translates[i], { toValue: 0, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        ])
+      )
+    ).start();
+  }, []);
+
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', maxWidth: 280 }}>
-      {chips.map((tp) => (
-        <View key={tp.key} style={{
-          paddingHorizontal: 14, paddingVertical: 9, borderRadius: 99,
-          backgroundColor: tp.hue + '18', borderWidth: 0.5, borderColor: tp.hue + '44',
-        }}>
+      {chips.map((tp, i) => (
+        <Animated.View
+          key={tp.key}
+          style={{
+            opacity: opacities[i],
+            transform: [{ translateY: translates[i] }],
+            paddingHorizontal: 14, paddingVertical: 9, borderRadius: 99,
+            backgroundColor: tp.hue + '18', borderWidth: 0.5, borderColor: tp.hue + '44',
+          }}
+        >
           <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 13, color: tp.hue }}>{tp.label}</Text>
-        </View>
+        </Animated.View>
       ))}
     </View>
   );
 }
 
+// Visual 3 — breathing "be kind" circle
 function Visual3() {
   const t = useTheme();
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(scale, { toValue: 1.14, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.9, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(scale, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.5, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]),
+      ])
+    ).start();
+  }, []);
+
   return (
-    <View style={{
-      width: 160, height: 160, borderRadius: 80,
-      borderWidth: 1, borderColor: t.amber + '60',
-      alignItems: 'center', justifyContent: 'center',
-    }}>
-      <View style={{
-        position: 'absolute', width: 120, height: 120, borderRadius: 60,
-        borderWidth: 0.5, borderColor: t.amber + '40',
+    <View style={{ width: 180, height: 180, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Outer breathing ring */}
+      <Animated.View style={{
+        position: 'absolute', width: 160, height: 160, borderRadius: 80,
+        borderWidth: 1, borderColor: t.amber + '60',
+        opacity, transform: [{ scale }],
       }} />
-      <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 28, color: t.amber }}>be kind</Text>
+      {/* Inner ring */}
+      <Animated.View style={{
+        position: 'absolute', width: 130, height: 130, borderRadius: 65,
+        borderWidth: 0.5, borderColor: t.amber + '40',
+        opacity, transform: [{ scale }],
+      }} />
+      <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 28, color: t.amber }}>
+        be kind
+      </Text>
     </View>
   );
 }
@@ -94,7 +176,7 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-      {/* Progress dots */}
+      {/* Progress bars */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 24, paddingTop: 16, gap: 6 }}>
         {steps.map((_, i) => (
           <View key={i} style={{
@@ -104,7 +186,7 @@ export default function OnboardingScreen() {
         ))}
       </View>
 
-      {/* Visual */}
+      {/* Animated visual */}
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
         {step === 0 && <Visual1 />}
         {step === 1 && <Visual2 />}
@@ -140,10 +222,8 @@ export default function OnboardingScreen() {
         )}
         <TouchableOpacity
           onPress={() => isLast ? router.replace('/(tabs)') : setStep(step + 1)}
-          style={{
-            flex: 1, paddingVertical: 16, backgroundColor: t.amber,
-            borderRadius: 99, alignItems: 'center',
-          }}
+          style={{ flex: 1, paddingVertical: 16, backgroundColor: t.amber, borderRadius: 99, alignItems: 'center' }}
+          activeOpacity={0.85}
         >
           <Text style={{ fontSize: 15, fontWeight: '600', color: t.bg, letterSpacing: -0.1 }}>{s.cta}</Text>
         </TouchableOpacity>

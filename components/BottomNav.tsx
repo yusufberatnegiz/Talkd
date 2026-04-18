@@ -17,7 +17,7 @@ export function BottomNav({ active }: { active: Tab }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+    <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 0 }}>
       <View style={{
         borderRadius: 99,
         borderWidth: 0.5,

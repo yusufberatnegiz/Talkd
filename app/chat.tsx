@@ -1,6 +1,7 @@
 import { SESSION_DURATION_SECONDS, SESSION_WARNING_SECONDS } from '@/constants/config';
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
+import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -45,10 +46,33 @@ function Sheet({ children, onClose }: { children: React.ReactNode; onClose: () =
   );
 }
 
+const REASON_MAP: Record<string, string> = {
+  'Harassment or abuse':       'harassment_or_abuse',
+  'Sexual content':            'sexual_content',
+  'Hate or discrimination':    'hate_or_discrimination',
+  'Self-harm encouragement':   'self_harm_encouragement',
+  'Spam or selling':           'spam_or_selling',
+  'Something else':            'something_else',
+};
+
 function ReportSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
   const t = useTheme();
   const [picked, setPicked] = useState<string | null>(null);
-  const reasons = ['Harassment or abuse', 'Sexual content', 'Hate or discrimination', 'Self-harm encouragement', 'Spam or selling', 'Something else'];
+  const [submitting, setSubmitting] = useState(false);
+  const reasons = Object.keys(REASON_MAP);
+
+  async function handleSubmit() {
+    if (!picked) return;
+    setSubmitting(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('reports').insert({
+      reason: REASON_MAP[picked],
+      reporter_id: user?.id ?? null,
+    });
+    setSubmitting(false);
+    onConfirm();
+  }
+
   return (
     <Sheet onClose={onClose}>
       <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 26, color: t.ink, letterSpacing: -0.3, marginBottom: 4 }}>
@@ -74,15 +98,15 @@ function ReportSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: (
         ))}
       </View>
       <TouchableOpacity
-        disabled={!picked}
-        onPress={onConfirm}
+        disabled={!picked || submitting}
+        onPress={handleSubmit}
         style={{
           paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginBottom: 8,
           backgroundColor: picked ? t.red : t.bg3,
         }}
       >
         <Text style={{ fontSize: 14.5, fontWeight: '600', color: picked ? '#fff' : t.ink4 }}>
-          Submit report & end
+          {submitting ? 'Sending…' : 'Submit report & end'}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onClose} style={{ paddingVertical: 14, alignItems: 'center' }}>

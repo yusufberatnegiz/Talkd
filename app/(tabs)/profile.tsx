@@ -14,27 +14,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 type MenuItem = { icon: LucideIcon; label: string; value?: string; destructive?: boolean; onPress?: () => void };
 type MenuSection = { section: string; items: MenuItem[] };
 
-const MENU: MenuSection[] = [
-  {
-    section: 'Preferences',
-    items: [
-      { icon: Bell, label: 'Notifications', value: 'On' },
-      { icon: Moon, label: 'Appearance', value: 'Auto' },
-      { icon: Shield, label: 'Privacy & data' },
-    ],
-  },
-  {
-    section: 'Support',
-    items: [
-      { icon: HelpCircle, label: 'Help center' },
-      { icon: MessageSquare, label: 'Become a listener' },
-    ],
-  },
-];
-
 export default function ProfileScreen() {
   const t = useTheme();
   const router = useRouter();
+
+  const MENU: MenuSection[] = [
+    {
+      section: 'Preferences',
+      items: [
+        { icon: Bell, label: 'Notifications', value: 'On' },
+        { icon: Moon, label: 'Appearance', value: 'Auto' },
+        { icon: Shield, label: 'Privacy & data' },
+      ],
+    },
+    {
+      section: 'Support',
+      items: [
+        { icon: HelpCircle, label: 'Help center' },
+        { icon: MessageSquare, label: 'Become a listener', onPress: () => router.push('/listener' as never) },
+      ],
+    },
+  ];
   const { stats, loading } = useUserStats();
 
   const dash = '—';

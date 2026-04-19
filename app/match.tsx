@@ -40,15 +40,13 @@ function RingSet({ hue, running }: { hue: string; running: boolean }) {
 
 function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: string; onBack: () => void }) {
   const t = useTheme();
+  const router = useRouter();
   const [note, setNote] = useState(specific);
   const [sent, setSent] = useState(false);
 
   if (sent) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-        <TouchableOpacity onPress={onBack} style={{ paddingHorizontal: 24, paddingTop: 12 }}>
-          <Text style={{ fontSize: 13, color: t.ink3 }}>← Done</Text>
-        </TouchableOpacity>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: hue, marginBottom: 28 }} />
           <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 32, lineHeight: 38, letterSpacing: -0.3, color: t.ink, textAlign: 'center' }}>
@@ -65,6 +63,13 @@ function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: stri
               "{note || 'Someone wanted to talk.'}"
             </Text>
           </View>
+          <TouchableOpacity
+            onPress={() => router.replace('/(tabs)')}
+            style={{ marginTop: 32, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 99, backgroundColor: hue }}
+            activeOpacity={0.85}
+          >
+            <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.bg }}>Go home</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );

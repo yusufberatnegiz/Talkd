@@ -1,6 +1,6 @@
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +23,7 @@ const STAR_LABELS = ['', 'Not great', 'Okay', 'Good', 'Really helpful', 'The bes
 
 export default function RatingScreen() {
   const t = useTheme();
+  const router = useRouter();
   const { topic: topicParam } = useLocalSearchParams<{ topic?: string }>();
   const tp = getTopic(topicParam ?? 'any');
 
@@ -42,6 +43,12 @@ export default function RatingScreen() {
   const handleStars = (n: number) => {
     setStars(n);
   };
+
+  useEffect(() => {
+    if (!submitted) return;
+    const id = setTimeout(() => router.replace('/(tabs)'), 2000);
+    return () => clearTimeout(id);
+  }, [submitted]);
 
   if (submitted) {
     return (

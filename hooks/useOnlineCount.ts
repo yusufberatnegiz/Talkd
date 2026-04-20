@@ -6,43 +6,36 @@ export function useOnlineCount() {
   const [byTopic, setByTopic] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let cancelled = false;
+    const channel = supabase.channel('presence:global');
 
-    async function setup() {
-      // If a stale channel with this topic exists (e.g. remount after navigation),
-      // await its removal so supabase.channel() creates a fresh one.
-      const stale = supabase.getChannels().find(c => c.topic === 'realtime:presence:global');
-      if (stale) await supabase.removeChannel(stale);
-      if (cancelled) return;
-
-      channel = supabase.channel('presence:global');
-
-      channel
-        .on('presence', { event: 'sync' }, () => {
-          if (!channel) return;
-          const state = channel.presenceState<{ topic: string | null }>();
-          const members = Object.values(state).flat();
-          setTotal(members.length);
-          const counts: Record<string, number> = {};
-          for (const m of members) {
-            if (m.topic) counts[m.topic] = (counts[m.topic] ?? 0) + 1;
-          }
-          setByTopic(counts);
-        })
-        .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED' && channel) {
-            await channel.track({ topic: null });
-          }
-        });
+    function handleSync() {
+      const state = channel.presenceState<{ topic: string | null }>();
+      const members = Object.values(state).flat();
+      setTotal(members.length);
+      const counts: Record<string, number> = {};
+      for (const m of members) {
+        if (m.topic) counts[m.topic] = (counts[m.topic] ?? 0) + 1;
+      }
+      setByTopic(counts);
     }
 
-    void setup();
+    // supabase.channel() returns an existing channel if one with this topic
+    // already exists in the registry. If the returned channel is already
+    // joined/joining (stale from a previous mount), .on() would throw.
+    // In that case we read current state once and skip re-subscribing.
+    const alreadyActive = channel.state === 'joined' || channel.state === 'joining';
 
-    return () => {
-      cancelled = true;
-      if (channel) void supabase.removeChannel(channel);
-    };
+    if (!alreadyActive) {
+      channel
+        .on('presence', { event: 'sync' }, handleSync)
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') await channel.track({ topic: null });
+        });
+    } else {
+      handleSync();
+    }
+
+    return () => { void supabase.removeChannel(channel); };
   }, []);
 
   return { total, byTopic };

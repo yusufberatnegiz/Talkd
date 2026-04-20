@@ -112,6 +112,8 @@ export default function ListenerScreen() {
                   topic: payload.topic,
                   specific: payload.specific,
                   other_user_id: payload.other_user_id,
+                  my_role: 'listener',
+                  specific_from: 'them',
                 },
               } as never);
             }, 1500);
@@ -157,6 +159,8 @@ export default function ListenerScreen() {
           topic: topicKey,
           specific: other.specific,
           other_user_id: other.userId,
+          my_role: 'listener',
+          specific_from: 'them',
         },
       } as never);
     }, 1500);

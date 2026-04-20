@@ -160,6 +160,7 @@ export default function MatchScreen() {
   const [fallback, setFallback] = useState(false);
   const [subscribeKey, setSubscribeKey] = useState(0);
   const [matchError, setMatchError] = useState<string | null>(null);
+  const [matchedUi, setMatchedUi] = useState(false);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const matchedRef = useRef(false);
@@ -188,7 +189,8 @@ export default function MatchScreen() {
   // Timer milestones
   useEffect(() => {
     if (matchedRef.current || fallback) return;
-    if (secs === 60 && !showOptions) setShowOptions(true);
+    // Show talker↔talker option before async fallback.
+    if (queueType === 'listener' && secs === 45 && !showOptions) setShowOptions(true);
     if (secs * 1000 >= MATCH_TIMEOUT_MS) {
       if (seekIntervalRef.current) { clearInterval(seekIntervalRef.current); seekIntervalRef.current = null; }
       if (channelRef.current) {
@@ -197,7 +199,7 @@ export default function MatchScreen() {
       }
       setFallback(true);
     }
-  }, [secs, fallback, showOptions]);
+  }, [secs, fallback, showOptions, queueType]);
 
   // Channel subscription
   useEffect(() => {
@@ -230,12 +232,24 @@ export default function MatchScreen() {
           if (matchedRef.current || payload.toId !== userId) return;
           matchedRef.current = true;
           if (seekIntervalRef.current) { clearInterval(seekIntervalRef.current); seekIntervalRef.current = null; }
-          void supabase.removeChannel(channel);
-          channelRef.current = null;
-          router.replace({
-            pathname: '/chat',
-            params: { session_id: payload.session_id, topic: payload.topic, intent: payload.matched_user_intent, specific: payload.specific, other_user_id: payload.other_user_id },
-          } as never);
+          setMatchedUi(true);
+          setTimeout(() => {
+            void supabase.removeChannel(channel);
+            channelRef.current = null;
+            router.replace({
+              pathname: '/chat',
+              params: {
+                session_id: payload.session_id,
+                topic: payload.topic,
+                intent: payload.matched_user_intent,
+                specific: payload.specific,
+                other_user_id: payload.other_user_id,
+                my_role: 'talker',
+                // In talker↔talker, the specific shown should be what the other party wrote.
+                specific_from: queueType === 'talker' ? 'them' : 'me',
+              },
+            } as never);
+          }, 1500);
         })
         .subscribe((status) => {
           if (status !== 'SUBSCRIBED') return;
@@ -271,6 +285,7 @@ export default function MatchScreen() {
     if (seekIntervalRef.current) { clearInterval(seekIntervalRef.current); seekIntervalRef.current = null; }
     setShowOptions(false);
     setMatchError(null);
+    setMatchedUi(true);
 
     const sessionId = makeSessionId(uid, other.userId);
     const matchedUserIntent = other.intent;
@@ -281,13 +296,22 @@ export default function MatchScreen() {
         matched_user_intent: matchedUserIntent, other_user_id: uid, specific,
       } as MatchedPayload,
     });
-    void supabase.removeChannel(channel);
-    channelRef.current = null;
-
-    router.replace({
-      pathname: '/chat',
-      params: { session_id: sessionId, topic: tp.key, intent: matchedUserIntent, specific, other_user_id: other.userId },
-    } as never);
+    setTimeout(() => {
+      void supabase.removeChannel(channel);
+      channelRef.current = null;
+      router.replace({
+        pathname: '/chat',
+        params: {
+          session_id: sessionId,
+          topic: tp.key,
+          intent: matchedUserIntent,
+          specific: queueType === 'talker' ? other.specific : specific,
+          other_user_id: other.userId,
+          my_role: 'talker',
+          specific_from: queueType === 'talker' ? 'them' : 'me',
+        },
+      } as never);
+    }, 1500);
   }
 
   async function handleMatchFromOffer(
@@ -300,6 +324,7 @@ export default function MatchScreen() {
     if (seekIntervalRef.current) { clearInterval(seekIntervalRef.current); seekIntervalRef.current = null; }
     setShowOptions(false);
     setMatchError(null);
+    setMatchedUi(true);
 
     const sessionId = makeSessionId(uid, offer.fromId);
     await channel.send({
@@ -309,13 +334,22 @@ export default function MatchScreen() {
         matched_user_intent: offer.intent, other_user_id: uid, specific,
       } as MatchedPayload,
     });
-    void supabase.removeChannel(channel);
-    channelRef.current = null;
-
-    router.replace({
-      pathname: '/chat',
-      params: { session_id: sessionId, topic: tp.key, intent: offer.intent, specific, other_user_id: offer.fromId },
-    } as never);
+    setTimeout(() => {
+      void supabase.removeChannel(channel);
+      channelRef.current = null;
+      router.replace({
+        pathname: '/chat',
+        params: {
+          session_id: sessionId,
+          topic: tp.key,
+          intent: offer.intent,
+          specific,
+          other_user_id: offer.fromId,
+          my_role: 'talker',
+          specific_from: 'me',
+        },
+      } as never);
+    }, 1500);
   }
 
   async function handleCancel() {
@@ -335,7 +369,6 @@ export default function MatchScreen() {
           matchedRef.current = false;
           setSecs(0);
           setShowOptions(false);
-          setQueueType('listener');
           setFallback(false);
           setSubscribeKey(k => k + 1);
         }}
@@ -360,9 +393,18 @@ export default function MatchScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Rings or options card */}
+      {/* Rings / matched / options card */}
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        {showOptions ? (
+        {matchedUi ? (
+          <View style={{ paddingHorizontal: 28, width: '100%', alignItems: 'center' }}>
+            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 30, lineHeight: 36, letterSpacing: -0.4, color: t.ink, textAlign: 'center', marginBottom: 8 }}>
+              Someone is here.
+            </Text>
+            <Text style={{ fontSize: 13, color: t.ink3, textAlign: 'center', lineHeight: 18 }}>
+              Opening the room…
+            </Text>
+          </View>
+        ) : showOptions ? (
           <View style={{ paddingHorizontal: 28, width: '100%' }}>
             <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 28, lineHeight: 34, letterSpacing: -0.4, color: t.ink, textAlign: 'center', marginBottom: 8 }}>
               No listener yet.

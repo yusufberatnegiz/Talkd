@@ -2,14 +2,80 @@ import { BottomNav } from '@/components/BottomNav';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/hooks/useTheme';
 import { useUserStats } from '@/hooks/useUserStats';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import {
   Bell, ChevronRight, HelpCircle,
   LogOut, MessageSquare, Moon, Shield,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Linking, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+type AppearanceChoice = 'light' | 'dark' | 'system';
+const APPEARANCE_KEY = 'talkd:appearance';
+const APPEARANCE_LABEL: Record<AppearanceChoice, string> = {
+  system: 'Auto',
+  light: 'Light',
+  dark: 'Dark',
+};
+
+function AppearanceSheet({ current, onSelect, onClose }: {
+  current: AppearanceChoice;
+  onSelect: (c: AppearanceChoice) => void;
+  onClose: () => void;
+}) {
+  const t = useTheme();
+  const options: { key: AppearanceChoice; label: string }[] = [
+    { key: 'system', label: 'System default' },
+    { key: 'light',  label: 'Light' },
+    { key: 'dark',   label: 'Dark' },
+  ];
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+          <View style={{
+            backgroundColor: t.bg2, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+            padding: 20, paddingBottom: 36, borderTopWidth: 0.5, borderColor: t.line,
+          }}>
+            <View style={{ width: 36, height: 4, borderRadius: 99, backgroundColor: t.ink5, alignSelf: 'center', marginBottom: 18 }} />
+            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 26, color: t.ink, letterSpacing: -0.3, marginBottom: 16 }}>
+              Appearance
+            </Text>
+            <View style={{ gap: 6 }}>
+              {options.map(o => {
+                const active = current === o.key;
+                return (
+                  <TouchableOpacity
+                    key={o.key}
+                    onPress={() => { onSelect(o.key); onClose(); }}
+                    style={{
+                      padding: 14, borderRadius: 14,
+                      backgroundColor: active ? t.amberSoft : t.bg3,
+                      borderWidth: active ? 1 : 0.5,
+                      borderColor: active ? t.amber + '60' : t.line,
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontSize: 15, color: active ? t.amber : t.ink }}>{o.label}</Text>
+                    {active && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: t.amber }} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
 
 type MenuItem = { icon: LucideIcon; label: string; value?: string; destructive?: boolean; onPress?: () => void };
 type MenuSection = { section: string; items: MenuItem[] };
@@ -17,14 +83,27 @@ type MenuSection = { section: string; items: MenuItem[] };
 export default function ProfileScreen() {
   const t = useTheme();
   const router = useRouter();
+  const [appearance, setAppearanceState] = useState<AppearanceChoice>('system');
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(APPEARANCE_KEY).then(val => {
+      if (val === 'light' || val === 'dark' || val === 'system') setAppearanceState(val);
+    });
+  }, []);
+
+  async function handleAppearanceSelect(choice: AppearanceChoice) {
+    await AsyncStorage.setItem(APPEARANCE_KEY, choice);
+    setAppearanceState(choice);
+  }
 
   const MENU: MenuSection[] = [
     {
       section: 'Preferences',
       items: [
-        { icon: Bell, label: 'Notifications', value: 'On' },
-        { icon: Moon, label: 'Appearance', value: 'Auto' },
-        { icon: Shield, label: 'Privacy & data' },
+        { icon: Bell, label: 'Notifications', value: 'On', onPress: () => Linking.openSettings() },
+        { icon: Moon, label: 'Appearance', value: APPEARANCE_LABEL[appearance], onPress: () => setAppearanceOpen(true) },
+        { icon: Shield, label: 'Privacy & data', onPress: () => router.push('/privacy' as never) },
       ],
     },
     {
@@ -175,6 +254,13 @@ export default function ProfileScreen() {
       </ScrollView>
 
       <BottomNav active="You" />
+      {appearanceOpen && (
+        <AppearanceSheet
+          current={appearance}
+          onSelect={handleAppearanceSelect}
+          onClose={() => setAppearanceOpen(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }

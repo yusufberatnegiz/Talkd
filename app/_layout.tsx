@@ -42,6 +42,7 @@ export default function RootLayout() {
         <Stack.Screen name="match" />
         <Stack.Screen name="chat" />
         <Stack.Screen name="listener" />
+        <Stack.Screen name="privacy" />
         <Stack.Screen name="rating" />
       </Stack>
     </>

@@ -26,18 +26,29 @@ export default function ListenerScreen() {
   const t = useTheme();
   const router = useRouter();
   const [online, setOnline] = useState(false);
-  const [topicFilter, setTopicFilter] = useState<string[]>(['rel', 'advice', 'career']);
+  const [topicFilter, setTopicFilter] = useState<string[]>([]);
   const [matched, setMatched] = useState(false);
 
   const [userId, setUserId] = useState<string | null>(null);
+  const [badgeCount, setBadgeCount] = useState<number | null>(null);
   const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
   const matchedRef = useRef(false);
 
   const topicsArr = Object.values(TOPICS);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      setUserId(user.id);
+      const { data } = await supabase
+        .from('session_ratings_public')
+        .select('badge')
+        .eq('rated_user_id', user.id)
+        .not('badge', 'is', null);
+      if (data) {
+        const distinct = new Set(data.map((r: { badge: string }) => r.badge)).size;
+        setBadgeCount(distinct);
+      }
     });
   }, []);
 
@@ -159,9 +170,11 @@ export default function ListenerScreen() {
           <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 18, color: t.ink3 }}>
             talkd · listener
           </Text>
-          <Text style={{ fontSize: 11, color: t.ink4, letterSpacing: 1.5, textTransform: 'uppercase' }}>
-            Your badges: 3
-          </Text>
+          {badgeCount !== null && badgeCount > 0 && (
+            <Text style={{ fontSize: 11, color: t.ink4, letterSpacing: 1.5, textTransform: 'uppercase' }}>
+              Your badges: {badgeCount}
+            </Text>
+          )}
         </View>
 
         {/* Headline */}

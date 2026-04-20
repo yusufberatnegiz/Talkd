@@ -336,6 +336,7 @@ export default function ChatScreen() {
           void supabase.removeChannel(channelRef.current);
           channelRef.current = null;
         }
+        setMessages([]);
         setTimeout(() => {
           router.replace({
             pathname: '/rating',
@@ -382,6 +383,7 @@ export default function ChatScreen() {
       await supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
+    setMessages([]);
     router.replace({
       pathname: '/rating',
       params: { topic: tp.key, session_id: sessionId ?? '', other_user_id: otherUserId ?? '' },

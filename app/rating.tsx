@@ -1,5 +1,6 @@
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
+import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -24,13 +25,22 @@ const STAR_LABELS = ['', 'Not great', 'Okay', 'Good', 'Really helpful', 'The bes
 export default function RatingScreen() {
   const t = useTheme();
   const router = useRouter();
-  const { topic: topicParam } = useLocalSearchParams<{ topic?: string }>();
+  const { topic: topicParam, session_id: sessionId, other_user_id: otherUserId } = useLocalSearchParams<{
+    topic?: string; session_id?: string; other_user_id?: string;
+  }>();
   const tp = getTopic(topicParam ?? 'any');
 
+  const [userId, setUserId] = useState<string | null>(null);
   const [stars, setStars] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
+  }, []);
 
   const isPositive = stars >= 3;
   const badges = stars === 0 ? POSITIVE_BADGES : isPositive ? POSITIVE_BADGES : NEGATIVE_BADGES;
@@ -39,6 +49,20 @@ export default function RatingScreen() {
   useEffect(() => {
     setPicked(null);
   }, [isPositive]);
+
+  async function handleSubmit() {
+    if (userId && sessionId && otherUserId) {
+      await supabase.from('session_ratings').insert({
+        session_id: sessionId,
+        rater_id: userId,
+        rated_user_id: otherUserId,
+        stars: stars || null,
+        badge: picked,
+        private_note: note.trim() || null,
+      });
+    }
+    setSubmitted(true);
+  }
 
   const handleStars = (n: number) => {
     setStars(n);
@@ -167,7 +191,7 @@ export default function RatingScreen() {
 
         {/* Submit */}
         <TouchableOpacity
-          onPress={() => setSubmitted(true)}
+          onPress={() => void handleSubmit()}
           style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: t.amber }}
           activeOpacity={0.85}
         >

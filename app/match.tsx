@@ -17,6 +17,7 @@ interface MatchedPayload {
   topic: string;
   intent: string;
   matched_user_intent: string;
+  other_user_id: string;
 }
 
 function RingSet({ hue, running }: { hue: string; running: boolean }) {
@@ -211,7 +212,7 @@ export default function MatchScreen() {
         channelRef.current = null;
         router.replace({
           pathname: '/chat',
-          params: { session_id: payload.session_id, topic: payload.topic, intent: payload.matched_user_intent, specific },
+          params: { session_id: payload.session_id, topic: payload.topic, intent: payload.matched_user_intent, specific, other_user_id: payload.other_user_id },
         } as never);
       })
       .subscribe(async (status) => {
@@ -254,6 +255,7 @@ export default function MatchScreen() {
       topic: tp.key,
       intent,
       matched_user_intent: matched.intent,
+      other_user_id: uid,
     };
 
     await channel.send({ type: 'broadcast', event: 'matched', payload: broadcastPayload });
@@ -262,7 +264,7 @@ export default function MatchScreen() {
 
     router.replace({
       pathname: '/chat',
-      params: { session_id: sessionId, topic: tp.key, intent: matched.intent, specific },
+      params: { session_id: sessionId, topic: tp.key, intent: matched.intent, specific, other_user_id: matched.user_id },
     } as never);
   }
 

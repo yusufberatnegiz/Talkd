@@ -1,6 +1,8 @@
 import { SESSION_DURATION_SECONDS, SESSION_WARNING_SECONDS } from '@/constants/config';
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
+import { supabase } from '@/lib/supabase';
+import { moderateMessage } from '@/lib/moderation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -54,14 +56,86 @@ const REASON_MAP: Record<string, string> = {
   'Something else':            'something_else',
 };
 
-function ReportSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
+function CrisisSheet({ onClose }: { onClose: () => void }) {
+  const t = useTheme();
+  const [secsLeft, setSecsLeft] = useState(5);
+
+  useEffect(() => {
+    if (secsLeft <= 0) return;
+    const id = setTimeout(() => setSecsLeft(s => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [secsLeft]);
+
+  const canDismiss = secsLeft <= 0;
+
+  return (
+    <Modal visible transparent animationType="slide">
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' }}>
+        <View style={{
+          backgroundColor: t.bg2, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+          padding: 24, paddingBottom: 40, borderTopWidth: 0.5, borderColor: t.line,
+        }}>
+          <View style={{ width: 36, height: 4, borderRadius: 99, backgroundColor: t.ink5, alignSelf: 'center', marginBottom: 20 }} />
+          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 26, color: t.ink, marginBottom: 8 }}>
+            You're not alone.
+          </Text>
+          <Text style={{ fontSize: 13.5, color: t.ink3, lineHeight: 20, marginBottom: 20 }}>
+            If you're in crisis, please reach out to someone trained to help right now.
+          </Text>
+          <View style={{ gap: 10, marginBottom: 24 }}>
+            {([
+              { name: 'Crisis Text Line', detail: 'Text HOME to 741741' },
+              { name: 'National Suicide & Crisis Lifeline', detail: 'Call or text 988' },
+              { name: 'International Association for Suicide Prevention', detail: 'iasp.info/resources/Crisis_Centres' },
+            ] as const).map(({ name, detail }) => (
+              <View key={name} style={{
+                padding: 14, borderRadius: 14, backgroundColor: t.bg3,
+                borderWidth: 0.5, borderColor: t.line,
+              }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: t.ink }}>{name}</Text>
+                <Text style={{ fontSize: 12.5, color: t.ink3, marginTop: 3 }}>{detail}</Text>
+              </View>
+            ))}
+          </View>
+          <TouchableOpacity
+            disabled={!canDismiss}
+            onPress={onClose}
+            style={{
+              paddingVertical: 14, borderRadius: 14, alignItems: 'center',
+              backgroundColor: canDismiss ? t.amber : t.bg3,
+            }}
+          >
+            <Text style={{ fontSize: 14.5, fontWeight: '600', color: canDismiss ? t.bg : t.ink4 }}>
+              {canDismiss ? 'Continue talking' : `Please read… ${secsLeft}s`}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function ReportSheet({
+  onClose, onConfirm, sessionId, reporterId, reportedUserId,
+}: {
+  onClose: () => void;
+  onConfirm: () => void;
+  sessionId: string;
+  reporterId: string;
+  reportedUserId: string;
+}) {
   const t = useTheme();
   const [picked, setPicked] = useState<string | null>(null);
   const reasons = Object.keys(REASON_MAP);
 
-  // TODO Phase 3: add reported_user_id and session_id once real matching is implemented
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!picked) return;
+    await supabase.from('reports').insert({
+      session_id: sessionId,
+      reporter_id: reporterId,
+      reported_user_id: reportedUserId,
+      reason: REASON_MAP[picked],
+    });
     onConfirm();
   }
 
@@ -91,7 +165,7 @@ function ReportSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: (
       </View>
       <TouchableOpacity
         disabled={!picked}
-        onPress={handleSubmit}
+        onPress={() => void handleSubmit()}
         style={{
           paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginBottom: 8,
           backgroundColor: picked ? t.red : t.bg3,
@@ -198,16 +272,19 @@ export default function ChatScreen() {
   const t = useTheme();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const { topic: topicParam, specific } = useLocalSearchParams<{
-    topic: string; specific: string;
+  const {
+    topic: topicParam, specific,
+    session_id: sessionId, other_user_id: otherUserId,
+  } = useLocalSearchParams<{
+    topic: string; specific: string; session_id: string; other_user_id: string;
   }>();
   const tp = getTopic(topicParam ?? 'any');
   const hue = tp.hue;
 
-  const [messages, setMessages] = useState<Message[]>([
-    { id: 1, from: 'them', text: "Hi. Take your time — no rush.", time: formatClock() },
-  ]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [timeLeft, setTimeLeft] = useState(SESSION_DURATION_SECONDS);
   const [timerActive, setTimerActive] = useState(true);
@@ -217,6 +294,7 @@ export default function ChatScreen() {
   const [continueOpen, setContinueOpen] = useState(false);
   const [youAgreed, setYouAgreed] = useState(false);
   const [theyAgreed, setTheyAgreed] = useState(false);
+  const [crisisOpen, setCrisisOpen] = useState(false);
   const [typing] = useState(false);
 
   function formatClock() {
@@ -230,7 +308,49 @@ export default function ChatScreen() {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
-  const goToRating = () => router.replace({ pathname: '/rating', params: { topic: tp.key } } as never);
+  // Load user ID
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
+  }, []);
+
+  // Channel subscription
+  useEffect(() => {
+    if (!sessionId || !userId) return;
+
+    const channel = supabase.channel(`session:${sessionId}`, {
+      config: { broadcast: { self: false } },
+    });
+
+    channel
+      .on('broadcast', { event: 'message' }, ({ payload }: { payload: { text: string; ts: string } }) => {
+        setMessages(prev => [...prev, { id: Date.now(), from: 'them', text: payload.text, time: payload.ts }]);
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      })
+      .on('broadcast', { event: 'continue_agree' }, () => {
+        setTheyAgreed(true);
+      })
+      .on('broadcast', { event: 'session_end' }, () => {
+        if (channelRef.current) {
+          void supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
+        setTimeout(() => {
+          router.replace({
+            pathname: '/rating',
+            params: { topic: tp.key, session_id: sessionId, other_user_id: otherUserId ?? '' },
+          } as never);
+        }, 700);
+      })
+      .subscribe();
+
+    channelRef.current = channel;
+    return () => {
+      void supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [sessionId, userId]);
 
   // Timer countdown
   useEffect(() => {
@@ -238,7 +358,6 @@ export default function ChatScreen() {
     if (timeLeft <= 0) {
       setTimerActive(false);
       setContinueOpen(true);
-      setTimeout(() => setTheyAgreed(true), 2400);
       return;
     }
     const id = setTimeout(() => setTimeLeft(n => n - 1), 1000);
@@ -257,13 +376,35 @@ export default function ChatScreen() {
     scrollRef.current?.scrollToEnd({ animated: false });
   }, [messages, typing]);
 
-  const send = () => {
+  async function goToRating() {
+    if (channelRef.current) {
+      await channelRef.current.send({ type: 'broadcast', event: 'session_end', payload: {} });
+      await supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    router.replace({
+      pathname: '/rating',
+      params: { topic: tp.key, session_id: sessionId ?? '', other_user_id: otherUserId ?? '' },
+    } as never);
+  }
+
+  async function send() {
     const text = draft.trim();
     if (!text) return;
-    setMessages(prev => [...prev, { id: Date.now(), from: 'me', text, time: formatClock() }]);
     setDraft('');
+    const { isSafe, isCrisis } = await moderateMessage(text);
+    if (isCrisis) { setCrisisOpen(true); return; }
+    if (!isSafe) return;
+    if (!channelRef.current) return;
+    await channelRef.current.send({ type: 'broadcast', event: 'message', payload: { text, ts: formatClock() } });
+    setMessages(prev => [...prev, { id: Date.now(), from: 'me', text, time: formatClock() }]);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-  };
+  }
+
+  async function handleContinueAgree() {
+    setYouAgreed(true);
+    await channelRef.current?.send({ type: 'broadcast', event: 'continue_agree', payload: {} });
+  }
 
   const isWarning = timeLeft <= SESSION_WARNING_SECONDS && timeLeft > 0;
 
@@ -369,7 +510,7 @@ export default function ChatScreen() {
               <View key={m.id} style={{ alignItems: mine ? 'flex-end' : 'flex-start', marginBottom: 14 }}>
                 <View style={{
                   maxWidth: '78%', paddingHorizontal: 15, paddingVertical: 11,
-                  borderRadius: mine ? 20 : 20,
+                  borderRadius: 20,
                   borderBottomRightRadius: mine ? 6 : 20,
                   borderBottomLeftRadius: mine ? 20 : 6,
                   backgroundColor: mine ? hue + '28' : t.bg3,
@@ -405,7 +546,7 @@ export default function ChatScreen() {
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              onSubmitEditing={send}
+              onSubmitEditing={() => void send()}
               placeholder="Say anything…"
               placeholderTextColor={t.ink4}
               returnKeyType="send"
@@ -413,7 +554,7 @@ export default function ChatScreen() {
               style={{ flex: 1, fontSize: 15, color: t.ink, paddingVertical: 8, maxHeight: 100, letterSpacing: -0.1 }}
             />
             <TouchableOpacity
-              onPress={send}
+              onPress={() => void send()}
               disabled={!draft.trim()}
               style={{
                 width: 34, height: 34, borderRadius: 17,
@@ -430,16 +571,30 @@ export default function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {reportOpen && <ReportSheet onClose={() => setReportOpen(false)} onConfirm={goToRating} />}
-      {exitOpen && <ExitSheet onClose={() => setExitOpen(false)} onConfirm={goToRating} />}
+      {reportOpen && userId && (
+        <ReportSheet
+          onClose={() => setReportOpen(false)}
+          onConfirm={() => void goToRating()}
+          sessionId={sessionId ?? ''}
+          reporterId={userId}
+          reportedUserId={otherUserId ?? ''}
+        />
+      )}
+      {exitOpen && (
+        <ExitSheet
+          onClose={() => setExitOpen(false)}
+          onConfirm={() => void goToRating()}
+        />
+      )}
       {continueOpen && (
         <ContinueSheet
           youAgreed={youAgreed}
           theyAgreed={theyAgreed}
-          onAgree={() => setYouAgreed(true)}
-          onDecline={goToRating}
+          onAgree={() => void handleContinueAgree()}
+          onDecline={() => void goToRating()}
         />
       )}
+      {crisisOpen && <CrisisSheet onClose={() => setCrisisOpen(false)} />}
     </SafeAreaView>
   );
 }

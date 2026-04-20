@@ -1,9 +1,23 @@
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
+import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+interface PresencePayload {
+  user_id: string;
+  intent: string;
+  specific: string;
+}
+
+interface MatchedPayload {
+  session_id: string;
+  topic: string;
+  intent: string;
+  matched_user_intent: string;
+}
 
 function RingSet({ hue, running }: { hue: string; running: boolean }) {
   const rings = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
@@ -111,10 +125,7 @@ function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: stri
         <TouchableOpacity
           disabled={!note.trim()}
           onPress={() => setSent(true)}
-          style={{
-            paddingVertical: 16, borderRadius: 99, alignItems: 'center',
-            backgroundColor: note.trim() ? hue : t.bg3,
-          }}
+          style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: note.trim() ? hue : t.bg3 }}
         >
           <Text style={{ fontSize: 15, fontWeight: '600', color: note.trim() ? t.bg : t.ink4 }}>
             Send into the quiet
@@ -135,34 +146,149 @@ export default function MatchScreen() {
   const intent = intentParam ?? 'chat';
   const specific = specificParam ?? '';
 
-  const [phase, setPhase] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
   const [secs, setSecs] = useState(0);
+  const [queueType, setQueueType] = useState<'listener' | 'talker'>('listener');
+  const [showOptions, setShowOptions] = useState(false);
   const [fallback, setFallback] = useState(false);
+  const [subscribeKey, setSubscribeKey] = useState(0);
+
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const matchedRef = useRef(false);
 
   const intentLabel = {
     vent: 'to listen', advice: 'to give honest advice',
     think: 'to think with you', chat: 'to chat',
   }[intent] ?? 'to talk';
 
-  const statusLine = ['looking for someone…', 'someone is here.', 'saying hello…'][phase] ?? '';
-
+  // Load user ID
   useEffect(() => {
-    const id = setInterval(() => setSecs(s => s + 1), 1000);
-    return () => clearInterval(id);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
   }, []);
 
+  // Timer
   useEffect(() => {
     if (fallback) return;
-    const t1 = setTimeout(() => setPhase(1), 3200);
-    const t2 = setTimeout(() => setPhase(2), 5200);
-    const t3 = setTimeout(() => {
-      router.replace({ pathname: '/chat', params: { topic: tp.key, intent, specific } } as never);
-    }, 6800);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    const id = setInterval(() => setSecs(s => s + 1), 1000);
+    return () => clearInterval(id);
   }, [fallback]);
 
+  // Timer milestones
+  useEffect(() => {
+    if (matchedRef.current || fallback) return;
+    if (secs === 60 && !showOptions) setShowOptions(true);
+    if (secs === 90) {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      setFallback(true);
+    }
+  }, [secs, fallback, showOptions]);
+
+  // Channel subscription
+  useEffect(() => {
+    if (!userId) return;
+
+    const channelName = `match-queue:${tp.key}:${queueType}`;
+    const channel = supabase.channel(channelName, {
+      config: { broadcast: { self: false } },
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        if (matchedRef.current) return;
+        const state = channel.presenceState<PresencePayload>();
+        const others = Object.values(state).flat().filter(m => m.user_id !== userId);
+        if (others.length > 0) void handleMatch(others[0], channel, userId);
+      })
+      .on('broadcast', { event: 'matched' }, ({ payload }: { payload: MatchedPayload }) => {
+        if (matchedRef.current) return;
+        matchedRef.current = true;
+        supabase.removeChannel(channel);
+        channelRef.current = null;
+        router.replace({
+          pathname: '/chat',
+          params: { session_id: payload.session_id, topic: payload.topic, intent: payload.matched_user_intent, specific },
+        } as never);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ user_id: userId, intent, specific });
+        }
+      });
+
+    channelRef.current = channel;
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [userId, queueType, subscribeKey]);
+
+  async function handleMatch(
+    matched: PresencePayload,
+    channel: ReturnType<typeof supabase.channel>,
+    uid: string,
+  ) {
+    if (matchedRef.current) return;
+    if (uid >= matched.user_id) return; // higher UUID waits for broadcast
+    matchedRef.current = true;
+    setShowOptions(false);
+
+    const { data, error } = await supabase
+      .from('sessions')
+      .insert({ user1_id: uid, user2_id: matched.user_id, topic: tp.key, status: 'active' })
+      .select('id')
+      .single();
+
+    if (error || !data) {
+      matchedRef.current = false;
+      return;
+    }
+
+    const sessionId = (data as { id: string }).id;
+    const broadcastPayload: MatchedPayload = {
+      session_id: sessionId,
+      topic: tp.key,
+      intent,
+      matched_user_intent: matched.intent,
+    };
+
+    await channel.send({ type: 'broadcast', event: 'matched', payload: broadcastPayload });
+    supabase.removeChannel(channel);
+    channelRef.current = null;
+
+    router.replace({
+      pathname: '/chat',
+      params: { session_id: sessionId, topic: tp.key, intent: matched.intent, specific },
+    } as never);
+  }
+
+  async function handleCancel() {
+    if (channelRef.current) {
+      await supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    router.back();
+  }
+
   if (fallback) {
-    return <FallbackScreen hue={tp.hue} specific={specific} onBack={() => setFallback(false)} />;
+    return (
+      <FallbackScreen
+        hue={tp.hue}
+        specific={specific}
+        onBack={() => {
+          matchedRef.current = false;
+          setSecs(0);
+          setShowOptions(false);
+          setQueueType('listener');
+          setFallback(false);
+          setSubscribeKey(k => k + 1);
+        }}
+      />
+    );
   }
 
   return (
@@ -177,59 +303,85 @@ export default function MatchScreen() {
           <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: tp.hue }} />
           <Text style={{ fontSize: 11, color: tp.hue, letterSpacing: 0.2 }}>{tp.label}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+        <TouchableOpacity onPress={handleCancel} style={{ padding: 8 }}>
           <Text style={{ fontSize: 13, color: t.ink3 }}>Cancel</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Rings */}
+      {/* Rings or options card */}
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <RingSet hue={tp.hue} running={phase < 2} />
-      </View>
-
-      {/* Status */}
-      <View style={{ paddingHorizontal: 40, paddingBottom: 16, alignItems: 'center' }}>
-        <Text style={{ fontSize: 10.5, letterSpacing: 2.4, color: t.ink4, textTransform: 'uppercase', marginBottom: 16 }}>
-          Looking for someone {intentLabel}
-        </Text>
-        <Text style={{
-          fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 30, lineHeight: 36, letterSpacing: -0.3,
-          color: phase === 1 ? tp.hue : t.ink, textAlign: 'center', minHeight: 72,
-        }}>
-          {statusLine}
-        </Text>
-        <Text style={{ marginTop: 20, fontSize: 12, color: t.ink4, letterSpacing: 0.3 }}>
-          {phase < 2 ? `${secs}s · usually under 30s` : 'connecting securely…'}
-        </Text>
-        {secs > 15 && phase < 2 && (
-          <TouchableOpacity
-            onPress={() => setFallback(true)}
-            style={{
-              marginTop: 18, paddingVertical: 10, paddingHorizontal: 18,
-              borderRadius: 99, borderWidth: 0.5, borderColor: t.lineStrong,
-            }}
-          >
-            <Text style={{ fontSize: 12.5, color: t.ink2 }}>Taking a while — leave a note instead →</Text>
-          </TouchableOpacity>
+        {showOptions ? (
+          <View style={{ paddingHorizontal: 28, width: '100%' }}>
+            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 28, lineHeight: 34, letterSpacing: -0.4, color: t.ink, textAlign: 'center', marginBottom: 8 }}>
+              No listener yet.
+            </Text>
+            <Text style={{ fontSize: 13, color: t.ink3, textAlign: 'center', lineHeight: 18, marginBottom: 28 }}>
+              What would you like to do?
+            </Text>
+            <View style={{ gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => setShowOptions(false)}
+                style={{ paddingVertical: 16, borderRadius: 16, alignItems: 'center', backgroundColor: tp.hue }}
+                activeOpacity={0.85}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '600', color: t.bg }}>Keep waiting for a listener</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => { setShowOptions(false); setQueueType('talker'); }}
+                style={{
+                  paddingVertical: 16, borderRadius: 16, alignItems: 'center',
+                  backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line,
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '500', color: t.ink }}>Talk to someone in the same situation</Text>
+                <Text style={{ fontSize: 11.5, color: t.ink3, marginTop: 4 }}>Match with another talker</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <RingSet hue={tp.hue} running />
         )}
       </View>
 
-      {/* Reassurance */}
-      <View style={{
-        marginHorizontal: 20, marginBottom: 30, padding: 14,
-        backgroundColor: t.bg2, borderWidth: 0.5, borderColor: t.line,
-        borderRadius: 16, flexDirection: 'row', gap: 12, alignItems: 'flex-start',
-      }}>
-        <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 1.3, borderColor: tp.hue, marginTop: 2 }} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 12, fontWeight: '500', color: t.ink, letterSpacing: -0.1 }}>
-            Neither of you will know who the other is.
+      {/* Status */}
+      {!showOptions && (
+        <View style={{ paddingHorizontal: 40, paddingBottom: 16, alignItems: 'center' }}>
+          <Text style={{ fontSize: 10.5, letterSpacing: 2.4, color: t.ink4, textTransform: 'uppercase', marginBottom: 16 }}>
+            {queueType === 'listener'
+              ? `Looking for someone ${intentLabel}`
+              : 'Looking for someone in the same situation'}
           </Text>
-          <Text style={{ fontSize: 11, color: t.ink3, marginTop: 2, lineHeight: 15 }}>
-            10–15 min session · ends when the timer runs out · nothing saved
+          <Text style={{
+            fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 30, lineHeight: 36,
+            letterSpacing: -0.3, color: t.ink, textAlign: 'center', minHeight: 72,
+          }}>
+            looking…
+          </Text>
+          <Text style={{ marginTop: 20, fontSize: 12, color: t.ink4, letterSpacing: 0.3 }}>
+            {secs}s · {secs < 30 ? 'usually under 60s' : 'taking a moment…'}
           </Text>
         </View>
-      </View>
+      )}
+
+      {/* Reassurance */}
+      {!showOptions && (
+        <View style={{
+          marginHorizontal: 20, marginBottom: 30, padding: 14,
+          backgroundColor: t.bg2, borderWidth: 0.5, borderColor: t.line,
+          borderRadius: 16, flexDirection: 'row', gap: 12, alignItems: 'flex-start',
+        }}>
+          <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 1.3, borderColor: tp.hue, marginTop: 2 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 12, fontWeight: '500', color: t.ink, letterSpacing: -0.1 }}>
+              Neither of you will know who the other is.
+            </Text>
+            <Text style={{ fontSize: 11, color: t.ink3, marginTop: 2, lineHeight: 15 }}>
+              10–15 min session · ends when the timer runs out · nothing saved
+            </Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

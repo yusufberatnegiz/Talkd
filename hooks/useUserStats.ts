@@ -25,7 +25,7 @@ export function useUserStats() {
           .select('duration_seconds')
           .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`),
         supabase
-          .from('session_ratings')
+          .from('session_ratings_public')
           .select('stars')
           .eq('rated_user_id', user.id),
       ]);

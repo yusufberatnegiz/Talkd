@@ -1,7 +1,6 @@
 import { SESSION_DURATION_SECONDS, SESSION_WARNING_SECONDS } from '@/constants/config';
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
-import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -58,18 +57,11 @@ const REASON_MAP: Record<string, string> = {
 function ReportSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
   const t = useTheme();
   const [picked, setPicked] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const reasons = Object.keys(REASON_MAP);
 
-  async function handleSubmit() {
+  // TODO Phase 3: add reported_user_id and session_id once real matching is implemented
+  function handleSubmit() {
     if (!picked) return;
-    setSubmitting(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('reports').insert({
-      reason: REASON_MAP[picked],
-      reporter_id: user?.id ?? null,
-    });
-    setSubmitting(false);
     onConfirm();
   }
 
@@ -98,7 +90,7 @@ function ReportSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: (
         ))}
       </View>
       <TouchableOpacity
-        disabled={!picked || submitting}
+        disabled={!picked}
         onPress={handleSubmit}
         style={{
           paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginBottom: 8,
@@ -106,7 +98,7 @@ function ReportSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: (
         }}
       >
         <Text style={{ fontSize: 14.5, fontWeight: '600', color: picked ? '#fff' : t.ink4 }}>
-          {submitting ? 'Sending…' : 'Submit report & end'}
+          Submit report & end
         </Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onClose} style={{ paddingVertical: 14, alignItems: 'center' }}>

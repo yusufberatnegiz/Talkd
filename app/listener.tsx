@@ -7,8 +7,14 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-interface PresencePayload {
-  user_id: string;
+function makeSessionId(a: string, b: string) {
+  const [lo, hi] = a < b ? [a, b] : [b, a];
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `s_${Date.now().toString(36)}_${lo.slice(0, 8)}_${hi.slice(0, 8)}_${rand}`;
+}
+
+interface SeekingPayload {
+  userId: string;
   intent: string;
   specific: string;
 }
@@ -16,7 +22,7 @@ interface PresencePayload {
 interface MatchedPayload {
   session_id: string;
   topic: string;
-  intent: string;
+  toId: string;
   matched_user_intent: string;
   other_user_id: string;
   specific: string;
@@ -33,6 +39,7 @@ export default function ListenerScreen() {
   const [badgeCount, setBadgeCount] = useState<number | null>(null);
   const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
   const matchedRef = useRef(false);
+  const removalPromiseRef = useRef<Promise<unknown>>(Promise.resolve());
 
   const topicsArr = Object.values(TOPICS);
 
@@ -53,8 +60,12 @@ export default function ListenerScreen() {
   }, []);
 
   function cleanupChannels() {
-    channelsRef.current.forEach(ch => void supabase.removeChannel(ch));
-    channelsRef.current = [];
+    if (channelsRef.current.length > 0) {
+      removalPromiseRef.current = Promise.all(
+        channelsRef.current.map(ch => supabase.removeChannel(ch))
+      );
+      channelsRef.current = [];
+    }
   }
 
   useEffect(() => {
@@ -63,82 +74,79 @@ export default function ListenerScreen() {
       return;
     }
 
-    cleanupChannels();
-    matchedRef.current = false;
+    let isCancelled = false;
 
-    topicFilter.forEach(topicKey => {
-      const channel = supabase.channel(`match-queue:${topicKey}:listener`, {
-        config: { broadcast: { self: false } },
-      });
+    async function setup() {
+      await removalPromiseRef.current;  // wait for any in-flight removal from previous cleanup
+      if (isCancelled) return;
 
-      channel
-        .on('presence', { event: 'sync' }, () => {
-          if (matchedRef.current) return;
-          const state = channel.presenceState<PresencePayload>();
-          const others = Object.values(state).flat().filter(m => m.user_id !== userId);
-          if (others.length > 0) void handleMatch(others[0], channel, userId, topicKey);
-        })
-        .on('broadcast', { event: 'matched' }, ({ payload }: { payload: MatchedPayload }) => {
-          if (matchedRef.current) return;
-          matchedRef.current = true;
-          cleanupChannels();
-          setMatched(true);
-          setTimeout(() => {
-            router.replace({
-              pathname: '/chat',
-              params: {
-                session_id: payload.session_id,
-                topic: payload.topic,
-                specific: payload.specific,
-                other_user_id: payload.other_user_id,
-              },
-            } as never);
-          }, 1500);
-        })
-        .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            await channel.track({ user_id: userId, intent: 'listen', specific: '' });
-          }
+      matchedRef.current = false;
+
+      topicFilter.forEach(topicKey => {
+        const channel = supabase.channel(`match-queue:${topicKey}:listener`, {
+          config: { broadcast: { self: false } },
         });
 
-      channelsRef.current.push(channel);
-    });
+        channel
+          .on('broadcast', { event: 'seeking' }, ({ payload }: { payload: SeekingPayload }) => {
+            if (matchedRef.current || payload.userId === userId) return;
+            if (userId! < payload.userId) {
+              void handleMatchAsLower(payload, channel, userId!, topicKey);
+            } else {
+              void channel.send({
+                type: 'broadcast', event: 'match-offer',
+                payload: { fromId: userId!, toId: payload.userId, intent: 'listen', specific: payload.specific },
+              });
+            }
+          })
+          .on('broadcast', { event: 'matched' }, ({ payload }: { payload: MatchedPayload }) => {
+            if (matchedRef.current || payload.toId !== userId) return;
+            matchedRef.current = true;
+            cleanupChannels();
+            setMatched(true);
+            setTimeout(() => {
+              router.replace({
+                pathname: '/chat',
+                params: {
+                  session_id: payload.session_id,
+                  topic: payload.topic,
+                  specific: payload.specific,
+                  other_user_id: payload.other_user_id,
+                },
+              } as never);
+            }, 1500);
+          })
+          .subscribe(() => { /* broadcast-only */ });
 
-    return () => { cleanupChannels(); };
+        channelsRef.current.push(channel);
+      });
+    }
+
+    void setup();
+
+    return () => { isCancelled = true; cleanupChannels(); };
   }, [online, topicFilter, userId]);
 
-  async function handleMatch(
-    other: PresencePayload,
+  async function handleMatchAsLower(
+    other: SeekingPayload,
     channel: ReturnType<typeof supabase.channel>,
     uid: string,
     topicKey: string,
   ) {
     if (matchedRef.current) return;
-    if (uid >= other.user_id) return; // higher UUID waits for broadcast
     matchedRef.current = true;
 
-    const { data, error } = await supabase
-      .from('sessions')
-      .insert({ user1_id: uid, user2_id: other.user_id, topic: topicKey, status: 'active' })
-      .select('id')
-      .single();
-
-    if (error || !data) {
-      matchedRef.current = false;
-      return;
-    }
-
-    const sessionId = (data as { id: string }).id;
-    const broadcastPayload: MatchedPayload = {
+    const sessionId = makeSessionId(uid, other.userId);
+    const matchedPayload: MatchedPayload = {
       session_id: sessionId,
       topic: topicKey,
-      intent: 'listen',
+      toId: other.userId,
       matched_user_intent: other.intent,
       other_user_id: uid,
       specific: other.specific,
     };
 
-    await channel.send({ type: 'broadcast', event: 'matched', payload: broadcastPayload });
+    await channel.send({ type: 'broadcast', event: 'matched', payload: matchedPayload });
     cleanupChannels();
     setMatched(true);
     setTimeout(() => {
@@ -148,7 +156,7 @@ export default function ListenerScreen() {
           session_id: sessionId,
           topic: topicKey,
           specific: other.specific,
-          other_user_id: other.user_id,
+          other_user_id: other.userId,
         },
       } as never);
     }, 1500);

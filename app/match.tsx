@@ -1,4 +1,5 @@
 import { getTopic } from '@/constants/topics';
+import { MATCH_TIMEOUT_MS } from '@/constants/config';
 import { useTheme } from '@/hooks/useTheme';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -6,19 +7,23 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-interface PresencePayload {
-  user_id: string;
-  intent: string;
-  specific: string;
-}
+interface SeekingPayload { userId: string; intent: string; specific: string; }
+interface OfferPayload   { fromId: string; toId: string; intent: string; specific: string; }
 
 interface MatchedPayload {
   session_id: string;
   topic: string;
-  intent: string;
+  toId: string;
   matched_user_intent: string;
   other_user_id: string;
   specific: string;
+}
+
+function makeSessionId(a: string, b: string) {
+  // Deterministic per pair per moment, collision-resistant enough for MVP channel naming.
+  const [lo, hi] = a < b ? [a, b] : [b, a];
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `s_${Date.now().toString(36)}_${lo.slice(0, 8)}_${hi.slice(0, 8)}_${rand}`;
 }
 
 function RingSet({ hue, running }: { hue: string; running: boolean }) {
@@ -154,9 +159,12 @@ export default function MatchScreen() {
   const [showOptions, setShowOptions] = useState(false);
   const [fallback, setFallback] = useState(false);
   const [subscribeKey, setSubscribeKey] = useState(0);
+  const [matchError, setMatchError] = useState<string | null>(null);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const matchedRef = useRef(false);
+  const seekIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const removalPromiseRef = useRef<Promise<unknown>>(Promise.resolve());
 
   const intentLabel = {
     vent: 'to listen', advice: 'to give honest advice',
@@ -181,7 +189,8 @@ export default function MatchScreen() {
   useEffect(() => {
     if (matchedRef.current || fallback) return;
     if (secs === 60 && !showOptions) setShowOptions(true);
-    if (secs === 90) {
+    if (secs * 1000 >= MATCH_TIMEOUT_MS) {
+      if (seekIntervalRef.current) { clearInterval(seekIntervalRef.current); seekIntervalRef.current = null; }
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -193,80 +202,119 @@ export default function MatchScreen() {
   // Channel subscription
   useEffect(() => {
     if (!userId) return;
+    let isCancelled = false;
 
-    const channelName = `match-queue:${tp.key}:${queueType}`;
-    const channel = supabase.channel(channelName, {
-      config: { broadcast: { self: false } },
-    });
+    async function setup() {
+      await removalPromiseRef.current;  // wait for any in-flight removal from previous cleanup
+      if (isCancelled) return;
 
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        if (matchedRef.current) return;
-        const state = channel.presenceState<PresencePayload>();
-        const others = Object.values(state).flat().filter(m => m.user_id !== userId);
-        if (others.length > 0) void handleMatch(others[0], channel, userId);
-      })
-      .on('broadcast', { event: 'matched' }, ({ payload }: { payload: MatchedPayload }) => {
-        if (matchedRef.current) return;
-        matchedRef.current = true;
-        supabase.removeChannel(channel);
-        channelRef.current = null;
-        router.replace({
-          pathname: '/chat',
-          params: { session_id: payload.session_id, topic: payload.topic, intent: payload.matched_user_intent, specific: payload.specific, other_user_id: payload.other_user_id },
-        } as never);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({ user_id: userId, intent, specific });
-        }
+      const channel = supabase.channel(`match-queue:${tp.key}:${queueType}`, {
+        config: { broadcast: { self: false } },
       });
+      channelRef.current = channel;
 
-    channelRef.current = channel;
+      channel
+        .on('broadcast', { event: 'seeking' }, ({ payload }: { payload: SeekingPayload }) => {
+          // Only relevant in talker-talker queue
+          if (queueType !== 'talker' || matchedRef.current || payload.userId === userId) return;
+          if (userId! < payload.userId) void handleMatchAsLower(payload, channel, userId!);
+          // else: higher UUID — wait for 'matched' from the lower-UUID talker
+        })
+        .on('broadcast', { event: 'match-offer' }, ({ payload }: { payload: OfferPayload }) => {
+          // Listener's UUID > ours — we're lower UUID, we create the session
+          if (matchedRef.current || payload.toId !== userId) return;
+          void handleMatchFromOffer(payload, channel, userId!);
+        })
+        .on('broadcast', { event: 'matched' }, ({ payload }: { payload: MatchedPayload }) => {
+          // Other side (lower UUID) already created session
+          if (matchedRef.current || payload.toId !== userId) return;
+          matchedRef.current = true;
+          if (seekIntervalRef.current) { clearInterval(seekIntervalRef.current); seekIntervalRef.current = null; }
+          void supabase.removeChannel(channel);
+          channelRef.current = null;
+          router.replace({
+            pathname: '/chat',
+            params: { session_id: payload.session_id, topic: payload.topic, intent: payload.matched_user_intent, specific: payload.specific, other_user_id: payload.other_user_id },
+          } as never);
+        })
+        .subscribe((status) => {
+          if (status !== 'SUBSCRIBED') return;
+          const broadcast = () => {
+            if (matchedRef.current) return;
+            void channel.send({ type: 'broadcast', event: 'seeking',
+              payload: { userId: userId!, intent, specific } });
+          };
+          broadcast();
+          seekIntervalRef.current = setInterval(broadcast, 8000);
+        });
+    }
+
+    void setup();
+
     return () => {
-      supabase.removeChannel(channel);
-      channelRef.current = null;
+      isCancelled = true;
+      if (seekIntervalRef.current) { clearInterval(seekIntervalRef.current); seekIntervalRef.current = null; }
+      if (channelRef.current) {
+        removalPromiseRef.current = supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [userId, queueType, subscribeKey]);
 
-  async function handleMatch(
-    matched: PresencePayload,
+  async function handleMatchAsLower(
+    other: SeekingPayload,
     channel: ReturnType<typeof supabase.channel>,
     uid: string,
   ) {
     if (matchedRef.current) return;
-    if (uid >= matched.user_id) return; // higher UUID waits for broadcast
     matchedRef.current = true;
+    if (seekIntervalRef.current) { clearInterval(seekIntervalRef.current); seekIntervalRef.current = null; }
     setShowOptions(false);
+    setMatchError(null);
 
-    const { data, error } = await supabase
-      .from('sessions')
-      .insert({ user1_id: uid, user2_id: matched.user_id, topic: tp.key, status: 'active' })
-      .select('id')
-      .single();
-
-    if (error || !data) {
-      matchedRef.current = false;
-      return;
-    }
-
-    const sessionId = (data as { id: string }).id;
-    const broadcastPayload: MatchedPayload = {
-      session_id: sessionId,
-      topic: tp.key,
-      intent,
-      matched_user_intent: matched.intent,
-      other_user_id: uid,
-      specific,
-    };
-
-    await channel.send({ type: 'broadcast', event: 'matched', payload: broadcastPayload });
-    supabase.removeChannel(channel);
+    const sessionId = makeSessionId(uid, other.userId);
+    const matchedUserIntent = other.intent;
+    await channel.send({
+      type: 'broadcast', event: 'matched',
+      payload: {
+        session_id: sessionId, topic: tp.key, toId: other.userId,
+        matched_user_intent: matchedUserIntent, other_user_id: uid, specific,
+      } as MatchedPayload,
+    });
+    void supabase.removeChannel(channel);
     channelRef.current = null;
 
     router.replace({
       pathname: '/chat',
-      params: { session_id: sessionId, topic: tp.key, intent: matched.intent, specific, other_user_id: matched.user_id },
+      params: { session_id: sessionId, topic: tp.key, intent: matchedUserIntent, specific, other_user_id: other.userId },
+    } as never);
+  }
+
+  async function handleMatchFromOffer(
+    offer: OfferPayload,
+    channel: ReturnType<typeof supabase.channel>,
+    uid: string,
+  ) {
+    if (matchedRef.current) return;
+    matchedRef.current = true;
+    if (seekIntervalRef.current) { clearInterval(seekIntervalRef.current); seekIntervalRef.current = null; }
+    setShowOptions(false);
+    setMatchError(null);
+
+    const sessionId = makeSessionId(uid, offer.fromId);
+    await channel.send({
+      type: 'broadcast', event: 'matched',
+      payload: {
+        session_id: sessionId, topic: tp.key, toId: offer.fromId,
+        matched_user_intent: offer.intent, other_user_id: uid, specific,
+      } as MatchedPayload,
+    });
+    void supabase.removeChannel(channel);
+    channelRef.current = null;
+
+    router.replace({
+      pathname: '/chat',
+      params: { session_id: sessionId, topic: tp.key, intent: offer.intent, specific, other_user_id: offer.fromId },
     } as never);
   }
 
@@ -362,6 +410,11 @@ export default function MatchScreen() {
           }}>
             looking…
           </Text>
+          {!!matchError && (
+            <Text style={{ marginTop: 10, fontSize: 12, color: t.red, textAlign: 'center' }}>
+              {matchError}
+            </Text>
+          )}
           <Text style={{ marginTop: 20, fontSize: 12, color: t.ink4, letterSpacing: 0.3 }}>
             {secs}s · {secs < 30 ? 'usually under 60s' : 'taking a moment…'}
           </Text>

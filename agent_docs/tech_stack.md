@@ -1,7 +1,26 @@
-# Tech Stack & Setup — Talkd
+# Tech Stack & Setup - Talkd
 
-## ⚠️ Expo Version Lock
-**Expo 54.0.33 is locked. Do not run `expo upgrade`. Do not change the expo version.**
+## Expo Version Lock
+**Expo 54.0.33 is locked. Do not run `expo upgrade`. Do not change the Expo version.**
+
+---
+
+## Current Stack
+
+| Area | Choice |
+|---|---|
+| Mobile | React Native + Expo 54.0.33 |
+| Routing | Expo Router |
+| Language | TypeScript strict |
+| Styling | React Native inline styles + shared theme tokens |
+| Theme | `useTheme()` and `useAppearance()` |
+| Backend/Auth/Realtime | Supabase v2 |
+| Auth | Apple + Email implemented; Phone OTP TODO |
+| Moderation | OpenAI Moderation API |
+| Push | Expo Notifications |
+| Error tracking | Sentry planned |
+
+NativeWind/Tailwind is intentionally not part of this project.
 
 ---
 
@@ -16,13 +35,6 @@ npm install expo@54.0.33
 # Supabase
 npm install @supabase/supabase-js
 npx supabase init
-
-# NativeWind v4
-npm install nativewind@^4.0.0 tailwindcss
-npx tailwindcss init
-
-# Zustand
-npm install zustand
 
 # Auth (Apple Sign In)
 npx expo install expo-apple-authentication
@@ -41,8 +53,10 @@ npm install @sentry/react-native
 npx sentry-wizard -i reactNative
 
 # Dev dependencies
-npm install -D typescript @types/react @types/react-native eslint
+npm install -D typescript @types/react eslint
 ```
+
+Do not install `nativewind` or `tailwindcss` unless the project owner explicitly changes the styling decision.
 
 ---
 
@@ -69,49 +83,32 @@ export const supabase = createClient(
 
 ---
 
-## NativeWind v4 Configuration
+## Styling Pattern
 
-```javascript
-// tailwind.config.js
-module.exports = {
-  content: [
-    './app/**/*.{js,jsx,ts,tsx}',
-    './components/**/*.{js,jsx,ts,tsx}',
-  ],
-  presets: [require('nativewind/preset')],
-  theme: {
-    extend: {
-      colors: {
-        // Talkd brand colors
-        primary: '#6366F1',       // Indigo
-        'primary-dark': '#4F46E5',
-      },
-    },
-  },
-};
-```
+Use React Native style objects and shared theme tokens from `lib/theme.ts`.
 
 ```typescript
-// babel.config.js — Add NativeWind plugin
-module.exports = {
-  presets: ['babel-preset-expo'],
-  plugins: ['nativewind/babel'],
-};
+import { useTheme } from '@/hooks/useTheme';
+import { Text, View } from 'react-native';
+
+export function Example() {
+  const t = useTheme();
+
+  return (
+    <View style={{ flex: 1, backgroundColor: t.bg, padding: 20 }}>
+      <Text style={{ color: t.ink, fontSize: 18, fontWeight: '600' }}>
+        Hello
+      </Text>
+    </View>
+  );
+}
 ```
 
-Usage:
-```typescript
-// Dark mode works automatically with system theme
-<View className="flex-1 bg-white dark:bg-gray-950">
-  <Text className="text-gray-900 dark:text-white text-xl font-bold">
-    Hello
-  </Text>
-</View>
-```
+Do not use `className` styling. Do not add Tailwind config.
 
 ---
 
-## Auth: Apple + Email + Phone
+## Auth: Apple + Email + Phone OTP TODO
 
 ```typescript
 // Sign in with Apple
@@ -132,14 +129,34 @@ async function signUpWithEmail(email: string, password: string) {
   return supabase.auth.signUp({ email, password });
 }
 
-// Phone OTP
+async function signInWithEmail(email: string, password: string) {
+  return supabase.auth.signInWithPassword({ email, password });
+}
+
+// Phone OTP - TODO
 async function signInWithPhone(phone: string) {
   return supabase.auth.signInWithOtp({ phone });
 }
+
 async function verifyOtp(phone: string, token: string) {
   return supabase.auth.verifyOtp({ phone, token, type: 'sms' });
 }
 ```
+
+---
+
+## Current Topics
+
+Keep the current 6 topics unless explicitly instructed otherwise:
+
+- Mental Health
+- Relationships
+- Career & Decisions
+- Late-Night
+- General Advice
+- Anything
+
+Source of truth: `constants/topics.ts`.
 
 ---
 
@@ -156,15 +173,15 @@ const chatChannel = supabase.channel(`session:${sessionId}`, {
   config: { broadcast: { self: false } }
 });
 
-// Send message (after moderation passes)
+// Send chat message only after moderation passes
 await chatChannel.send({
   type: 'broadcast',
   event: 'message',
   payload: { text, tempId, timestamp, senderId }
 });
 
-// Always unsubscribe on session end
-await chatChannel.unsubscribe();
+// Always unsubscribe/remove on session end
+await supabase.removeChannel(chatChannel);
 ```
 
 ---
@@ -177,7 +194,7 @@ import OpenAI from 'openai';
 
 const openai = new OpenAI({
   apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true,  // Required for Expo
+  dangerouslyAllowBrowser: true,
 });
 
 export async function moderateMessage(text: string): Promise<{
@@ -197,55 +214,9 @@ export async function moderateMessage(text: string): Promise<{
 
 ---
 
-## Zustand Store Pattern
-
-```typescript
-// store/matchStore.ts
-import { create } from 'zustand';
-
-interface MatchStore {
-  selectedTopic: string | null;
-  selectedRole: 'TALKER' | 'LISTENER' | null;
-  selectedIntent: 'WANT_ADVICE' | 'WANT_TO_BE_HEARD' | null;
-  sessionId: string | null;
-  messages: Message[];           // NEVER persisted
-  isOtherTyping: boolean;
-  setTopic: (t: string) => void;
-  setRole: (r: 'TALKER' | 'LISTENER') => void;
-  setIntent: (i: 'WANT_ADVICE' | 'WANT_TO_BE_HEARD') => void;
-  setSession: (id: string) => void;
-  addMessage: (m: Message) => void;
-  setTyping: (t: boolean) => void;
-  clearSession: () => void;      // ALWAYS call on session end
-}
-
-export const useMatchStore = create<MatchStore>((set) => ({
-  selectedTopic: null,
-  selectedRole: null,
-  selectedIntent: null,
-  sessionId: null,
-  messages: [],
-  isOtherTyping: false,
-  setTopic: (selectedTopic) => set({ selectedTopic }),
-  setRole: (selectedRole) => set({ selectedRole }),
-  setIntent: (selectedIntent) => set({ selectedIntent }),
-  setSession: (sessionId) => set({ sessionId }),
-  addMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
-  setTyping: (isOtherTyping) => set({ isOtherTyping }),
-  clearSession: () => set({
-    sessionId: null,
-    messages: [],          // Wipe all messages
-    isOtherTyping: false,
-  }),
-}));
-```
-
----
-
 ## TypeScript Config
 
 ```json
-// tsconfig.json
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
@@ -267,38 +238,22 @@ export const useMatchStore = create<MatchStore>((set) => ({
 ```typescript
 // constants/config.ts
 export const SESSION_DURATION_SECONDS = 900;      // 15 minutes
-export const SESSION_WARNING_SECONDS = 120;        // Warning at 2:00
-export const MATCH_TIMEOUT_MS = 30_000;            // 30s → async fallback
-export const ESTIMATED_TIME_THRESHOLD_S = 60;      // Only show estimate if < 60s
+export const SESSION_WARNING_SECONDS = 120;       // Warning at 2:00
+export const MATCH_TIMEOUT_MS = 90_000;           // 90s -> async fallback
+export const ESTIMATED_TIME_THRESHOLD_S = 60;
 export const ASYNC_MESSAGE_EXPIRY_HOURS = 24;
 export const REPORT_BAN_THRESHOLD = 3;
 export const BAN_DURATION_HOURS = 24;
 export const REENGAGEMENT_INACTIVE_HOURS = 48;
 ```
 
----
-
-## Rating Labels
-
-```typescript
-// constants/ratingLabels.ts
-export const RATING_LABELS = [
-  'Felt heard',
-  'Great listener',
-  'Helpful advice',
-  'Very supportive',
-  'Awkward',
-  'Left too early',
-  'Not helpful',
-];
-```
+Do not change `MATCH_TIMEOUT_MS` unless explicitly instructed.
 
 ---
 
 ## Environment Variables
 
 ```bash
-# .env
 EXPO_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 EXPO_PUBLIC_OPENAI_API_KEY=sk-...

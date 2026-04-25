@@ -1,6 +1,6 @@
 export const SESSION_DURATION_SECONDS = 900;
 export const SESSION_WARNING_SECONDS = 120;
-export const MATCH_TIMEOUT_MS = 30_000;
+export const MATCH_TIMEOUT_MS = 90_000;
 export const ESTIMATED_TIME_THRESHOLD_S = 60;
 export const ASYNC_MESSAGE_EXPIRY_HOURS = 24;
 export const REPORT_BAN_THRESHOLD = 3;

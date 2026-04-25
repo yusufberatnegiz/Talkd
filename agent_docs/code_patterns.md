@@ -1,13 +1,45 @@
-# Code Patterns — Talkd
+# Code Patterns - Talkd
 
 ## Naming Conventions
+
+```text
+Components:    PascalCase  -> MessageBubble.tsx
+Hooks:         camelCase   -> useSession.ts
+Routes:        kebab-case  -> role-select.tsx
+Types/Enums:   PascalCase  -> Topic, Role, Intent
+Constants:     SCREAMING   -> SESSION_DURATION_SECONDS
+Theme tokens:  t.*         -> t.bg, t.ink, t.line
 ```
-Components:    PascalCase  → MessageBubble.tsx
-Hooks:         camelCase   → useSession.ts
-Routes:        kebab-case  → role-select.tsx
-Types/Enums:   PascalCase  → Topic, Role, Intent
-Constants:     SCREAMING   → SESSION_DURATION_SECONDS
-Stores:        useXxxStore → useMatchStore
+
+---
+
+## Styling Pattern
+
+Use React Native inline styles with `useTheme()`. NativeWind/Tailwind is not used.
+
+```typescript
+import { useTheme } from '@/hooks/useTheme';
+import { Text, View } from 'react-native';
+
+export function Panel({ title }: { title: string }) {
+  const t = useTheme();
+
+  return (
+    <View
+      style={{
+        borderRadius: 16,
+        backgroundColor: t.bg3,
+        borderWidth: 0.5,
+        borderColor: t.line,
+        padding: 16,
+      }}
+    >
+      <Text style={{ color: t.ink, fontSize: 16, fontWeight: '600' }}>
+        {title}
+      </Text>
+    </View>
+  );
+}
 ```
 
 ---
@@ -16,25 +48,39 @@ Stores:        useXxxStore → useMatchStore
 
 ```typescript
 // components/chat/MessageBubble.tsx
-import { View, Text } from 'react-native';
+import { Text, View } from 'react-native';
+import { useTheme } from '@/hooks/useTheme';
 
 interface MessageBubbleProps {
   text: string;
   isMine: boolean;
   timestamp: string;
+  hue: string;
 }
 
-export function MessageBubble({ text, isMine, timestamp }: MessageBubbleProps) {
+export function MessageBubble({ text, isMine, timestamp, hue }: MessageBubbleProps) {
+  const t = useTheme();
+
   return (
-    <View className={`max-w-xs px-4 py-3 rounded-2xl mb-2 ${
-      isMine
-        ? 'self-end bg-indigo-600'
-        : 'self-start bg-gray-200 dark:bg-gray-800'
-    }`}>
-      <Text className="text-white text-base leading-relaxed">{text}</Text>
-      <Text className={`text-xs mt-1 ${
-        isMine ? 'text-indigo-200 text-right' : 'text-gray-400'
-      }`}>
+    <View style={{ alignItems: isMine ? 'flex-end' : 'flex-start', marginBottom: 14 }}>
+      <View
+        style={{
+          maxWidth: '78%',
+          paddingHorizontal: 15,
+          paddingVertical: 11,
+          borderRadius: 20,
+          borderBottomRightRadius: isMine ? 6 : 20,
+          borderBottomLeftRadius: isMine ? 20 : 6,
+          backgroundColor: isMine ? `${hue}28` : t.bg3,
+          borderWidth: 0.5,
+          borderColor: isMine ? `${hue}40` : t.line,
+        }}
+      >
+        <Text style={{ fontSize: 15, lineHeight: 21, color: t.ink }}>
+          {text}
+        </Text>
+      </View>
+      <Text style={{ fontSize: 10, color: t.ink4, paddingHorizontal: 6, marginTop: 3 }}>
         {timestamp}
       </Text>
     </View>
@@ -47,10 +93,8 @@ export function MessageBubble({ text, isMine, timestamp }: MessageBubbleProps) {
 ## Chat Header (Report + Exit Always Visible)
 
 ```typescript
-// components/chat/ChatHeader.tsx
-// RULE: Report and Exit must ALWAYS be visible. Never hidden. Never in a menu.
-
-import { View, Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { useTheme } from '@/hooks/useTheme';
 
 interface ChatHeaderProps {
   secondsLeft: number;
@@ -59,24 +103,59 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({ secondsLeft, onReport, onExit }: ChatHeaderProps) {
+  const t = useTheme();
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   const isWarning = secondsLeft <= 120;
 
   return (
-    <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-      <TouchableOpacity onPress={onReport} className="px-3 py-2">
-        <Text className="text-red-500 text-sm font-medium">Report</Text>
+    <View
+      style={{
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        borderBottomWidth: 0.5,
+        borderBottomColor: t.line,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+      }}
+    >
+      <TouchableOpacity
+        onPress={onReport}
+        style={{
+          minWidth: 44,
+          height: 44,
+          paddingHorizontal: 12,
+          borderRadius: 12,
+          backgroundColor: t.redDim,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ fontSize: 12.5, fontWeight: '500', color: t.red }}>
+          Report
+        </Text>
       </TouchableOpacity>
 
-      <Text className={`text-base font-bold tabular-nums ${
-        isWarning ? 'text-red-500' : 'text-gray-900 dark:text-white'
-      }`}>
+      <Text style={{ flex: 1, textAlign: 'center', color: isWarning ? t.red : t.ink }}>
         {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
       </Text>
 
-      <TouchableOpacity onPress={onExit} className="px-3 py-2">
-        <Text className="text-gray-500 text-sm font-medium">Exit</Text>
+      <TouchableOpacity
+        onPress={onExit}
+        style={{
+          minWidth: 44,
+          height: 44,
+          paddingHorizontal: 12,
+          borderRadius: 12,
+          backgroundColor: t.bg3,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ fontSize: 12.5, fontWeight: '500', color: t.ink }}>
+          Exit
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -88,65 +167,49 @@ export function ChatHeader({ secondsLeft, onReport, onExit }: ChatHeaderProps) {
 ## Crisis Popup (5-Second Lock)
 
 ```typescript
-// components/modals/CrisisPopup.tsx
-import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Linking, Modal } from 'react-native';
-import { CRISIS_RESOURCES } from '@/constants/crisis';
+import { useEffect, useState } from 'react';
+import { Modal, Text, TouchableOpacity, View } from 'react-native';
+import { useTheme } from '@/hooks/useTheme';
 
 interface CrisisPopupProps {
   visible: boolean;
   onContinue: () => void;
-  onEndSession: () => void;
 }
 
-export function CrisisPopup({ visible, onContinue, onEndSession }: CrisisPopupProps) {
+export function CrisisPopup({ visible, onContinue }: CrisisPopupProps) {
+  const t = useTheme();
   const [canDismiss, setCanDismiss] = useState(false);
 
   useEffect(() => {
-    if (visible) {
-      setCanDismiss(false);
-      // 5-second lock — hard requirement
-      const timer = setTimeout(() => setCanDismiss(true), 5000);
-      return () => clearTimeout(timer);
-    }
+    if (!visible) return;
+    setCanDismiss(false);
+    const timer = setTimeout(() => setCanDismiss(true), 5000);
+    return () => clearTimeout(timer);
   }, [visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 bg-black/60 justify-center px-6">
-        <View className="bg-white dark:bg-gray-900 rounded-3xl p-6">
-          <Text className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            You don't have to go through this alone.
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' }}>
+        <View style={{ backgroundColor: t.bg2, padding: 24, paddingBottom: 40 }}>
+          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 26, color: t.ink }}>
+            You're not alone.
           </Text>
-          <Text className="text-gray-600 dark:text-gray-400 mb-6">
-            Real support is available right now.
+          <Text style={{ fontSize: 13.5, color: t.ink3, lineHeight: 20, marginTop: 8 }}>
+            If you're in crisis, please reach out to someone trained to help right now.
           </Text>
-
-          {CRISIS_RESOURCES.map((r) => (
-            <TouchableOpacity
-              key={r.name}
-              onPress={() => Linking.openURL(`tel:${r.number}`)}
-              className="bg-indigo-50 dark:bg-indigo-950 rounded-xl px-4 py-3 mb-3"
-            >
-              <Text className="font-semibold text-indigo-700 dark:text-indigo-300">{r.name}</Text>
-              <Text className="text-indigo-500 text-sm">{r.available}</Text>
-            </TouchableOpacity>
-          ))}
-
           <TouchableOpacity
-            onPress={onEndSession}
-            className="py-3 mb-2"
-          >
-            <Text className="text-center text-red-500 font-medium">End Session</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={onContinue}
             disabled={!canDismiss}
-            className={`py-3 rounded-xl ${canDismiss ? 'bg-gray-100 dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900 opacity-40'}`}
+            onPress={onContinue}
+            style={{
+              marginTop: 24,
+              paddingVertical: 14,
+              borderRadius: 14,
+              alignItems: 'center',
+              backgroundColor: canDismiss ? t.amber : t.bg3,
+            }}
           >
-            <Text className="text-center text-gray-600 dark:text-gray-400">
-              {canDismiss ? 'Continue Conversation' : 'Please wait...'}
+            <Text style={{ fontSize: 14.5, fontWeight: '600', color: canDismiss ? t.bg : t.ink4 }}>
+              {canDismiss ? 'Continue talking' : 'Please read...'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -158,152 +221,60 @@ export function CrisisPopup({ visible, onContinue, onEndSession }: CrisisPopupPr
 
 ---
 
-## Message Send Flow (CRITICAL — Follow Exactly)
+## Message Send Flow
 
 ```typescript
-// In chat.tsx — this is the ONLY correct way to send a message
-
 async function handleSend(text: string) {
   if (!text.trim() || !chatChannel || !sessionId) return;
 
-  // Step 1: Moderate BEFORE sending — no exceptions
   const { isSafe, isCrisis } = await moderateMessage(text);
 
   if (isCrisis) {
-    // Show crisis popup — do NOT send the message
     setCrisisVisible(true);
     return;
   }
 
-  if (!isSafe) {
-    // Drop silently — do NOT send
-    return;
-  }
+  if (!isSafe) return;
 
-  // Step 2: Add to local state (optimistic UI)
-  const tempId = Math.random().toString(36).slice(2);
-  addMessage({ text, isMine: true, tempId, timestamp: new Date().toISOString() });
+  const timestamp = new Date().toISOString();
+  addMessage({ text, isMine: true, timestamp });
 
-  // Step 3: Broadcast via Supabase Realtime (NOT saved to DB)
   await chatChannel.send({
     type: 'broadcast',
     event: 'message',
-    payload: { text, tempId, timestamp: new Date().toISOString(), senderId: userId },
+    payload: { text, timestamp, senderId: userId },
   });
 }
 ```
 
----
-
-## Session End (Always Call clearSession)
-
-```typescript
-// Called from: timer expiry, user exit, other user exit, crisis
-function handleSessionEnd(reason: string) {
-  // 1. Unsubscribe from Supabase channel
-  chatChannel?.unsubscribe();
-
-  // 2. Wipe messages from state — ALWAYS
-  clearSession();
-
-  // 3. Navigate based on reason
-  if (reason === 'timer_expired' || reason === 'other_user_exit') {
-    router.replace('/rating');  // Show rating screen
-  } else {
-    router.replace('/home');
-  }
-}
-```
+Chat text must be moderated before broadcast. Messages are not inserted into the database.
 
 ---
 
-## Post-Session Rating
+## Session End
 
 ```typescript
-// app/(app)/rating.tsx
-import { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { RATING_LABELS } from '@/constants/ratingLabels';
-import { supabase } from '@/lib/supabase';
-
-export default function RatingScreen() {
-  const [stars, setStars] = useState(0);
-  const [labels, setLabels] = useState<string[]>([]);
-  const sessionId = useMatchStore((s) => s.sessionId);
-
-  async function handleSubmit() {
-    // NOTE: No user_id — rating is fully anonymous
-    await supabase.from('session_ratings').insert({
-      session_id: sessionId,
-      stars,
-      labels,
-    });
-    router.replace('/home');
+async function handleSessionEnd() {
+  if (chatChannel) {
+    await supabase.removeChannel(chatChannel);
   }
 
-  return (
-    <View className="flex-1 bg-white dark:bg-gray-950 px-6 py-8">
-      <Text className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-        How was your conversation?
-      </Text>
-
-      {/* Stars */}
-      <View className="flex-row justify-center gap-3 my-6">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <TouchableOpacity key={n} onPress={() => setStars(n)}>
-            <Text className={`text-4xl ${n <= stars ? 'opacity-100' : 'opacity-30'}`}>⭐</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Labels */}
-      <View className="flex-row flex-wrap gap-2 mb-8">
-        {RATING_LABELS.map((label) => (
-          <TouchableOpacity
-            key={label}
-            onPress={() => setLabels((prev) =>
-              prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
-            )}
-            className={`px-4 py-2 rounded-full border ${
-              labels.includes(label)
-                ? 'bg-indigo-600 border-indigo-600'
-                : 'bg-transparent border-gray-300 dark:border-gray-700'
-            }`}
-          >
-            <Text className={labels.includes(label) ? 'text-white' : 'text-gray-600 dark:text-gray-400'}>
-              {label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity
-        onPress={handleSubmit}
-        disabled={stars === 0}
-        className={`py-4 rounded-2xl ${stars > 0 ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-800'}`}
-      >
-        <Text className="text-white text-center font-semibold text-lg">Done</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => router.replace('/home')} className="py-3 mt-2">
-        <Text className="text-center text-gray-400">Skip</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  setMessages([]);
+  router.replace('/rating');
 }
 ```
+
+Always remove/unsubscribe the realtime channel and wipe local messages on session end.
 
 ---
 
 ## Error Handling
 
 ```typescript
-// Always capture errors — never swallow them
 try {
   await doSomething();
 } catch (error) {
-  Sentry.captureException(error);
-  // Show user-friendly message if needed
-  Alert.alert('Something went wrong', 'Please try again.');
+  // Capture with Sentry once configured.
+  console.error(error);
 }
 ```

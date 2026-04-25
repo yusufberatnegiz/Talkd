@@ -273,12 +273,14 @@ export default function ChatScreen() {
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const typingIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
-    topic: topicParam, specific,
+    topic: topicParam, specific, specific_from,
     session_id: sessionId, other_user_id: otherUserId,
   } = useLocalSearchParams<{
-    topic: string; specific: string; session_id: string; other_user_id: string;
+    topic: string; specific: string; specific_from: string;
+    session_id: string; other_user_id: string;
   }>();
   const tp = getTopic(topicParam ?? 'any');
   const hue = tp.hue;
@@ -295,7 +297,7 @@ export default function ChatScreen() {
   const [youAgreed, setYouAgreed] = useState(false);
   const [theyAgreed, setTheyAgreed] = useState(false);
   const [crisisOpen, setCrisisOpen] = useState(false);
-  const [typing] = useState(false);
+  const [typing, setTyping] = useState(false);
 
   function formatClock() {
     const d = new Date();
@@ -331,6 +333,9 @@ export default function ChatScreen() {
       .on('broadcast', { event: 'continue_agree' }, () => {
         setTheyAgreed(true);
       })
+      .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { isTyping: boolean } }) => {
+        setTyping(payload.isTyping);
+      })
       .on('broadcast', { event: 'session_end' }, () => {
         if (channelRef.current) {
           void supabase.removeChannel(channelRef.current);
@@ -348,6 +353,7 @@ export default function ChatScreen() {
 
     channelRef.current = channel;
     return () => {
+      if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
       void supabase.removeChannel(channel);
       channelRef.current = null;
     };
@@ -390,9 +396,21 @@ export default function ChatScreen() {
     } as never);
   }
 
+  function handleDraftChange(text: string) {
+    setDraft(text);
+    if (!channelRef.current) return;
+    void channelRef.current.send({ type: 'broadcast', event: 'typing', payload: { isTyping: true } });
+    if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
+    typingIdleTimeoutRef.current = setTimeout(() => {
+      void channelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { isTyping: false } });
+    }, 2000);
+  }
+
   async function send() {
     const text = draft.trim();
     if (!text) return;
+    if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
+    void channelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { isTyping: false } });
     setDraft('');
     const { isSafe, isCrisis } = await moderateMessage(text);
     if (isCrisis) { setCrisisOpen(true); return; }
@@ -493,7 +511,7 @@ export default function ChatScreen() {
           <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
             <View style={{ padding: 10, backgroundColor: t.bg2, borderRadius: 14, borderWidth: 0.5, borderColor: t.line }}>
               <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 12, color: t.ink3 }}>
-                You wrote: "{specific}"
+                {specific_from === 'them' ? 'They wrote' : 'You wrote'}: "{specific}"
               </Text>
             </View>
           </View>
@@ -547,7 +565,7 @@ export default function ChatScreen() {
           }}>
             <TextInput
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={handleDraftChange}
               onSubmitEditing={() => void send()}
               placeholder="Say anything…"
               placeholderTextColor={t.ink4}

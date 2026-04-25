@@ -1,4 +1,4 @@
-# CLAUDE.md - Claude Code Configuration for Talkd
+# CODEX.md - Codex Configuration for Talkd
 
 ## Read First
 Always read `AGENTS.md` before starting any task.
@@ -15,10 +15,10 @@ Always read `AGENTS.md` before starting any task.
 ## Workflow
 1. Read `AGENTS.md` -> current phase + active task.
 2. Read the relevant `agent_docs/` file.
-3. Propose plan (2-5 bullets) -> wait for approval when doing feature work.
+3. For feature work, propose a 2-5 bullet plan and wait for approval.
 4. Implement one feature at a time.
-5. Run `npx.cmd tsc --noEmit` and `npx.cmd eslint .` after each change on Windows.
-6. Fix all errors before next task.
+5. Run `npx.cmd tsc --noEmit` and `npx.cmd eslint .` after changes.
+6. Keep changes scoped and do not rewrite unrelated files.
 
 ## Commands
 ```bash
@@ -31,10 +31,10 @@ npx.cmd supabase gen types typescript --local > types/supabase.ts
 ```
 
 ## Current Product Decisions
-- Do not add NativeWind or Tailwind.
-- Keep the current 6 topics.
+- NativeWind is intentionally not used.
+- Keep the current 6 topics: Mental Health, Relationships, Career & Decisions, Late-Night, General Advice, Anything.
 - Keep `MATCH_TIMEOUT_MS = 90_000`.
-- Phone OTP is still TODO.
+- Phone OTP is an explicit TODO.
 
 ## Hard Rules
 - Expo 54.0.33 - never upgrade.

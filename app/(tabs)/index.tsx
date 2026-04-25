@@ -13,7 +13,7 @@ function Dot({ size = 6, color }: { size?: number; color: string }) {
 export default function HomeScreen() {
   const t = useTheme();
   const router = useRouter();
-  const { total, byTopic } = useOnlineCount();
+  const { total } = useOnlineCount();
 
   const topicsArr = Object.values(TOPICS);
 
@@ -69,10 +69,6 @@ export default function HomeScreen() {
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Dot size={7} color={tp.hue} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Dot size={4} color={tp.hue} />
-                  <Text style={{ fontSize: 10.5, color: tp.hue, letterSpacing: 0.3 }}>{byTopic[tp.key] ?? '…'}</Text>
-                </View>
               </View>
               <View>
                 <Text style={{ fontFamily: 'Georgia', fontSize: 20, letterSpacing: -0.3, lineHeight: 24, color: t.ink, marginBottom: 4 }}>

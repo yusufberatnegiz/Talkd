@@ -41,6 +41,7 @@ async function createSession(input: {
     .single();
 
   if (error || !data?.id) {
+    console.error('Session creation failed', error);
     throw new Error('Session could not be created.');
   }
 
@@ -349,7 +350,8 @@ export default function MatchScreen() {
           },
         } as never);
       }, 1500);
-    } catch {
+    } catch (error: unknown) {
+      console.error('Talker match session creation failed', error);
       matchedRef.current = false;
       setMatchedUi(false);
       setMatchError('Could not create the session. Please try matching again.');
@@ -400,7 +402,8 @@ export default function MatchScreen() {
           },
         } as never);
       }, 1500);
-    } catch {
+    } catch (error: unknown) {
+      console.error('Talker offer session creation failed', error);
       matchedRef.current = false;
       setMatchedUi(false);
       setMatchError('Could not create the session. Please try matching again.');

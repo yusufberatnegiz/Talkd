@@ -1,8 +1,7 @@
-create table if not exists session_ratings (
-  id uuid primary key default gen_random_uuid(),
-  rated_user_id uuid references profiles(id) on delete set null,
-  topic text not null,
-  duration_minutes int not null,
-  stars int not null check (stars between 1 and 5),
-  created_at timestamptz not null default now()
-);
+-- Superseded by the core schema migration.
+--
+-- This migration originally created a partial session_ratings table that
+-- referenced profiles before profiles existed in migrations. Keep this file
+-- intentionally harmless so clean database resets can continue to the
+-- complete Talkd schema migration.
+create extension if not exists pgcrypto;

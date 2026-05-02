@@ -7,12 +7,6 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-function makeSessionId(a: string, b: string) {
-  const [lo, hi] = a < b ? [a, b] : [b, a];
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `s_${Date.now().toString(36)}_${lo.slice(0, 8)}_${hi.slice(0, 8)}_${rand}`;
-}
-
 interface SeekingPayload {
   userId: string;
   intent: string;
@@ -28,12 +22,40 @@ interface MatchedPayload {
   specific: string;
 }
 
+async function createSession(input: {
+  topic: string;
+  specific: string;
+  listenerId: string;
+  talkerId: string;
+  talkerIntent: string;
+}): Promise<string> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .insert({
+      topic: input.topic,
+      specific: input.specific || null,
+      participant_a: input.listenerId,
+      participant_b: input.talkerId,
+      intent_a: 'listen',
+      intent_b: input.talkerIntent,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw new Error('Session could not be created.');
+  }
+
+  return data.id as string;
+}
+
 export default function ListenerScreen() {
   const t = useTheme();
   const router = useRouter();
   const [online, setOnline] = useState(false);
   const [topicFilter, setTopicFilter] = useState<string[]>([]);
   const [matched, setMatched] = useState(false);
+  const [topicError, setTopicError] = useState('');
 
   const [userId, setUserId] = useState<string | null>(null);
   const [badgeCount, setBadgeCount] = useState<number | null>(null);
@@ -49,12 +71,11 @@ export default function ListenerScreen() {
       setUserId(user.id);
       const { data } = await supabase
         .from('session_ratings_public')
-        .select('badge')
+        .select('badge_count')
         .eq('rated_user_id', user.id)
-        .not('badge', 'is', null);
+        .maybeSingle();
       if (data) {
-        const distinct = new Set(data.map((r: { badge: string }) => r.badge)).size;
-        setBadgeCount(distinct);
+        setBadgeCount((data as { badge_count: number | null }).badge_count ?? 0);
       }
     });
   }, []);
@@ -138,36 +159,59 @@ export default function ListenerScreen() {
     if (matchedRef.current) return;
     matchedRef.current = true;
 
-    const sessionId = makeSessionId(uid, other.userId);
-    const matchedPayload: MatchedPayload = {
-      session_id: sessionId,
-      topic: topicKey,
-      toId: other.userId,
-      matched_user_intent: other.intent,
-      other_user_id: uid,
-      specific: other.specific,
-    };
+    try {
+      const sessionId = await createSession({
+        topic: topicKey,
+        specific: other.specific,
+        listenerId: uid,
+        talkerId: other.userId,
+        talkerIntent: other.intent,
+      });
+      const matchedPayload: MatchedPayload = {
+        session_id: sessionId,
+        topic: topicKey,
+        toId: other.userId,
+        matched_user_intent: other.intent,
+        other_user_id: uid,
+        specific: other.specific,
+      };
 
-    await channel.send({ type: 'broadcast', event: 'matched', payload: matchedPayload });
-    cleanupChannels();
-    setMatched(true);
-    setTimeout(() => {
-      router.replace({
-        pathname: '/chat',
-        params: {
-          session_id: sessionId,
-          topic: topicKey,
-          specific: other.specific,
-          other_user_id: other.userId,
-          my_role: 'listener',
-          specific_from: 'them',
-        },
-      } as never);
-    }, 1500);
+      await channel.send({ type: 'broadcast', event: 'matched', payload: matchedPayload });
+      cleanupChannels();
+      setMatched(true);
+      setTimeout(() => {
+        router.replace({
+          pathname: '/chat',
+          params: {
+            session_id: sessionId,
+            topic: topicKey,
+            specific: other.specific,
+            other_user_id: other.userId,
+            my_role: 'listener',
+            specific_from: 'them',
+          },
+        } as never);
+      }, 1500);
+    } catch {
+      matchedRef.current = false;
+      setMatched(false);
+      setTopicError('Could not create the session. Try going on duty again.');
+    }
   }
 
   const toggleTopic = (k: string) => {
+    setTopicError('');
     setTopicFilter(tf => tf.includes(k) ? tf.filter(x => x !== k) : [...tf, k]);
+  };
+
+  const handleDutyToggle = () => {
+    if (matched) return;
+    if (!online && topicFilter.length === 0) {
+      setTopicError('Pick at least one topic before going on duty.');
+      return;
+    }
+    setTopicError('');
+    setOnline(o => !o);
   };
 
   return (
@@ -211,7 +255,7 @@ export default function ListenerScreen() {
           </Text>
 
           <TouchableOpacity
-            onPress={() => { if (!matched) setOnline(o => !o); }}
+            onPress={handleDutyToggle}
             style={{
               marginTop: 24, paddingVertical: 13, paddingHorizontal: 22,
               borderRadius: 99,
@@ -227,6 +271,11 @@ export default function ListenerScreen() {
               {matched ? 'Connecting…' : online ? 'Live — tap to pause' : 'Go on duty'}
             </Text>
           </TouchableOpacity>
+          {!!topicError && (
+            <Text style={{ marginTop: 10, fontSize: 12, color: t.red, lineHeight: 16 }}>
+              {topicError}
+            </Text>
+          )}
         </View>
 
         {/* Topic filter */}

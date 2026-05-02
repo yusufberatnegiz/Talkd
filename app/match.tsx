@@ -19,11 +19,32 @@ interface MatchedPayload {
   specific: string;
 }
 
-function makeSessionId(a: string, b: string) {
-  // Deterministic per pair per moment, collision-resistant enough for MVP channel naming.
-  const [lo, hi] = a < b ? [a, b] : [b, a];
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `s_${Date.now().toString(36)}_${lo.slice(0, 8)}_${hi.slice(0, 8)}_${rand}`;
+async function createSession(input: {
+  topic: string;
+  specific: string;
+  participantA: string;
+  participantB: string;
+  intentA: string;
+  intentB: string;
+}): Promise<string> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .insert({
+      topic: input.topic,
+      specific: input.specific || null,
+      participant_a: input.participantA,
+      participant_b: input.participantB,
+      intent_a: input.intentA,
+      intent_b: input.intentB,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data?.id) {
+    throw new Error('Session could not be created.');
+  }
+
+  return data.id as string;
 }
 
 function RingSet({ hue, running }: { hue: string; running: boolean }) {
@@ -294,31 +315,45 @@ export default function MatchScreen() {
     setMatchError(null);
     setMatchedUi(true);
 
-    const sessionId = makeSessionId(uid, other.userId);
-    const matchedUserIntent = other.intent;
-    await channel.send({
-      type: 'broadcast', event: 'matched',
-      payload: {
-        session_id: sessionId, topic: tp.key, toId: other.userId,
-        matched_user_intent: matchedUserIntent, other_user_id: uid, specific,
-      } as MatchedPayload,
-    });
-    setTimeout(() => {
-      void supabase.removeChannel(channel);
-      channelRef.current = null;
-      router.replace({
-        pathname: '/chat',
-        params: {
-          session_id: sessionId,
-          topic: tp.key,
-          intent: matchedUserIntent,
-          specific: queueType === 'talker' ? other.specific : specific,
-          other_user_id: other.userId,
-          my_role: 'talker',
-          specific_from: queueType === 'talker' ? 'them' : 'me',
-        },
-      } as never);
-    }, 1500);
+    try {
+      const matchedUserIntent = other.intent;
+      const sessionSpecific = queueType === 'talker' ? other.specific : specific;
+      const sessionId = await createSession({
+        topic: tp.key,
+        specific: sessionSpecific,
+        participantA: uid,
+        participantB: other.userId,
+        intentA: intent,
+        intentB: matchedUserIntent,
+      });
+      await channel.send({
+        type: 'broadcast', event: 'matched',
+        payload: {
+          session_id: sessionId, topic: tp.key, toId: other.userId,
+          matched_user_intent: matchedUserIntent, other_user_id: uid, specific,
+        } as MatchedPayload,
+      });
+      setTimeout(() => {
+        void supabase.removeChannel(channel);
+        channelRef.current = null;
+        router.replace({
+          pathname: '/chat',
+          params: {
+            session_id: sessionId,
+            topic: tp.key,
+            intent: matchedUserIntent,
+            specific: sessionSpecific,
+            other_user_id: other.userId,
+            my_role: 'talker',
+            specific_from: queueType === 'talker' ? 'them' : 'me',
+          },
+        } as never);
+      }, 1500);
+    } catch {
+      matchedRef.current = false;
+      setMatchedUi(false);
+      setMatchError('Could not create the session. Please try matching again.');
+    }
   }
 
   async function handleMatchFromOffer(
@@ -333,30 +368,43 @@ export default function MatchScreen() {
     setMatchError(null);
     setMatchedUi(true);
 
-    const sessionId = makeSessionId(uid, offer.fromId);
-    await channel.send({
-      type: 'broadcast', event: 'matched',
-      payload: {
-        session_id: sessionId, topic: tp.key, toId: offer.fromId,
-        matched_user_intent: offer.intent, other_user_id: uid, specific,
-      } as MatchedPayload,
-    });
-    setTimeout(() => {
-      void supabase.removeChannel(channel);
-      channelRef.current = null;
-      router.replace({
-        pathname: '/chat',
-        params: {
-          session_id: sessionId,
-          topic: tp.key,
-          intent: offer.intent,
-          specific,
-          other_user_id: offer.fromId,
-          my_role: 'talker',
-          specific_from: 'me',
-        },
-      } as never);
-    }, 1500);
+    try {
+      const sessionId = await createSession({
+        topic: tp.key,
+        specific,
+        participantA: uid,
+        participantB: offer.fromId,
+        intentA: intent,
+        intentB: offer.intent,
+      });
+      await channel.send({
+        type: 'broadcast', event: 'matched',
+        payload: {
+          session_id: sessionId, topic: tp.key, toId: offer.fromId,
+          matched_user_intent: offer.intent, other_user_id: uid, specific,
+        } as MatchedPayload,
+      });
+      setTimeout(() => {
+        void supabase.removeChannel(channel);
+        channelRef.current = null;
+        router.replace({
+          pathname: '/chat',
+          params: {
+            session_id: sessionId,
+            topic: tp.key,
+            intent: offer.intent,
+            specific,
+            other_user_id: offer.fromId,
+            my_role: 'talker',
+            specific_from: 'me',
+          },
+        } as never);
+      }, 1500);
+    } catch {
+      matchedRef.current = false;
+      setMatchedUi(false);
+      setMatchError('Could not create the session. Please try matching again.');
+    }
   }
 
   async function handleCancel() {

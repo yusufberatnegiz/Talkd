@@ -409,6 +409,13 @@ export default function ChatScreen() {
   }, [messages, typing]);
 
   async function goToRating() {
+    if (sessionId) {
+      await supabase
+        .from('sessions')
+        .update({ status: 'ended', ended_at: new Date().toISOString() })
+        .eq('id', sessionId);
+    }
+
     if (channelRef.current) {
       await channelRef.current.send({ type: 'broadcast', event: 'session_end', payload: {} });
       await supabase.removeChannel(channelRef.current);

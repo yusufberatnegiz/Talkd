@@ -457,12 +457,18 @@ export default function ChatScreen() {
         return;
       }
       const sentAt = formatClock();
-      await channelRef.current.send({ type: 'broadcast', event: 'message', payload: { text, ts: sentAt } });
+      const sendResult = await channelRef.current.send({ type: 'broadcast', event: 'message', payload: { text, ts: sentAt } });
+      if (sendResult !== 'ok') {
+        console.error('Realtime message send failed', sendResult);
+        setSendError('Message could not be sent. Check your connection and try again.');
+        return;
+      }
       setDraft('');
       setMessages(prev => [...prev, { id: Date.now(), from: 'me', text, time: sentAt }]);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch {
-      setSendError('Message could not be sent. Check your connection and try again.');
+    } catch (error: unknown) {
+      console.error('Message send failed', error);
+      setSendError('Safety check is busy. Please try again in a moment.');
     }
   }
 

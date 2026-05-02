@@ -14,7 +14,8 @@ export async function moderateMessage(text: string): Promise<{
   });
 
   if (error) {
-    throw new Error('Moderation failed.');
+    console.error('Moderation function failed', error);
+    throw new Error('Moderation is temporarily busy.');
   }
 
   return {

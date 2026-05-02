@@ -10,8 +10,7 @@ export default function PrivacyScreen() {
   const router = useRouter();
   const [exportMessage, setExportMessage] = useState(false);
 
-  async function handleDeleteAccount() {
-    // TODO Phase 5: replace with Edge Function that deletes auth user + all data
+  async function handleSignOut() {
     await supabase.auth.signOut();
     router.replace('/auth');
   }
@@ -54,7 +53,7 @@ export default function PrivacyScreen() {
           >
             <Text style={{ fontSize: 15, fontWeight: '500', color: t.ink }}>Export my data</Text>
             <Text style={{ fontSize: 12.5, color: t.ink3, marginTop: 3 }}>
-              Download a copy of your session history and ratings.
+              Download a copy of your session activity and ratings.
             </Text>
           </TouchableOpacity>
           {exportMessage && (
@@ -64,16 +63,16 @@ export default function PrivacyScreen() {
           )}
         </View>
 
-        {/* Delete account */}
+        {/* Sign out */}
         <View style={{ borderRadius: 16, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.red + '40', overflow: 'hidden' }}>
           <TouchableOpacity
-            onPress={handleDeleteAccount}
+            onPress={handleSignOut}
             style={{ paddingHorizontal: 20, paddingVertical: 18 }}
             activeOpacity={0.7}
           >
-            <Text style={{ fontSize: 15, fontWeight: '500', color: t.red }}>Delete my account</Text>
+            <Text style={{ fontSize: 15, fontWeight: '500', color: t.red }}>Sign out</Text>
             <Text style={{ fontSize: 12.5, color: t.ink3, marginTop: 3 }}>
-              Permanently removes your account and all associated data.
+              Signs you out on this device. Your account remains active.
             </Text>
           </TouchableOpacity>
         </View>

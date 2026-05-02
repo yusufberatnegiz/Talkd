@@ -2,11 +2,11 @@ import { theme } from '@/lib/theme';
 import { useRouter } from 'expo-router';
 import { Text, TouchableOpacity, View } from 'react-native';
 
-export type Tab = 'Talk' | 'History' | 'You';
+export type Tab = 'Talk' | 'Activity' | 'You';
 
 const TABS: { label: Tab; route: string }[] = [
   { label: 'Talk', route: '/(tabs)' },
-  { label: 'History', route: '/(tabs)/history' },
+  { label: 'Activity', route: '/(tabs)/history' },
   { label: 'You', route: '/(tabs)/profile' },
 ];
 

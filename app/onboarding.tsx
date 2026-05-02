@@ -150,7 +150,7 @@ export default function OnboardingScreen() {
       before: "You're not ",
       italic: 'alone.',
       accentColor: t.amber,
-      body: 'talkd connects you with a real stranger, right now, for 10–15 minutes. No names. No history. No records.',
+      body: 'talkd connects you with a real stranger, right now, for 10-15 minutes. Real-time anonymous chat. Messages are not saved after the session.',
       cta: 'Ok',
     },
     {
@@ -166,7 +166,7 @@ export default function OnboardingScreen() {
       before: 'One rule: ',
       italic: 'be kind.',
       accentColor: '#B5A8D9',
-      body: "No names, no photos, no contact info — it keeps everyone safe. In crisis we'll point you somewhere better.",
+      body: "No names, no photos, no contact info. Session metadata, reports, and ratings may be stored for safety and quality.",
       cta: 'I understand',
     },
   ];

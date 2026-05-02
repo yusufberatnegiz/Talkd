@@ -41,7 +41,7 @@ export default function HomeScreen() {
         {/* Greeting */}
         <View style={{ paddingHorizontal: 28, paddingTop: 40, paddingBottom: 24 }}>
           <Text style={{ fontSize: 11, letterSpacing: 2.2, color: t.ink4, textTransform: 'uppercase', marginBottom: 16 }}>
-            ANONYMOUS · REAL TIME · NO RECORDS
+            REAL-TIME ANONYMOUS CHAT
           </Text>
           <Text style={{ fontFamily: 'Georgia', fontSize: 40, lineHeight: 44, letterSpacing: -0.8, color: t.ink }}>
             {'What do you want to\ntalk about?'}

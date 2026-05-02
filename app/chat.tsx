@@ -126,17 +126,35 @@ function ReportSheet({
 }) {
   const t = useTheme();
   const [picked, setPicked] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const reasons = Object.keys(REASON_MAP);
 
   async function handleSubmit() {
     if (!picked) return;
-    await supabase.from('reports').insert({
-      session_id: sessionId,
-      reporter_id: reporterId,
-      reported_user_id: reportedUserId,
-      reason: REASON_MAP[picked],
-    });
-    onConfirm();
+    if (!sessionId || !reporterId || !reportedUserId) {
+      setError('Report could not be sent because this session is missing details.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      const { error: reportError } = await supabase.from('reports').insert({
+        session_id: sessionId,
+        reporter_id: reporterId,
+        reported_user_id: reportedUserId,
+        reason: REASON_MAP[picked],
+      });
+      if (reportError) {
+        setError('Report could not be sent. Check your connection and try again.');
+        return;
+      }
+      onConfirm();
+    } catch {
+      setError('Report could not be sent. Check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -151,7 +169,7 @@ function ReportSheet({
         {reasons.map(r => (
           <TouchableOpacity
             key={r}
-            onPress={() => setPicked(r)}
+            onPress={() => { setPicked(r); if (error) setError(''); }}
             style={{
               padding: 13, borderRadius: 12,
               backgroundColor: picked === r ? t.red + '20' : t.bg3,
@@ -164,17 +182,22 @@ function ReportSheet({
         ))}
       </View>
       <TouchableOpacity
-        disabled={!picked}
+        disabled={!picked || submitting}
         onPress={() => void handleSubmit()}
         style={{
           paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginBottom: 8,
-          backgroundColor: picked ? t.red : t.bg3,
+          backgroundColor: picked && !submitting ? t.red : t.bg3,
         }}
       >
-        <Text style={{ fontSize: 14.5, fontWeight: '600', color: picked ? '#fff' : t.ink4 }}>
-          Submit report & end
+        <Text style={{ fontSize: 14.5, fontWeight: '600', color: picked && !submitting ? '#fff' : t.ink4 }}>
+          {submitting ? 'Sending report...' : 'Submit report & end'}
         </Text>
       </TouchableOpacity>
+      {!!error && (
+        <Text style={{ fontSize: 12.5, color: t.red, lineHeight: 18, marginBottom: 8 }}>
+          {error}
+        </Text>
+      )}
       <TouchableOpacity onPress={onClose} style={{ paddingVertical: 14, alignItems: 'center' }}>
         <Text style={{ fontSize: 14, color: t.ink3 }}>Cancel</Text>
       </TouchableOpacity>
@@ -298,6 +321,7 @@ export default function ChatScreen() {
   const [theyAgreed, setTheyAgreed] = useState(false);
   const [crisisOpen, setCrisisOpen] = useState(false);
   const [typing, setTyping] = useState(false);
+  const [sendError, setSendError] = useState('');
 
   function formatClock() {
     const d = new Date();
@@ -356,6 +380,7 @@ export default function ChatScreen() {
       if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
       void supabase.removeChannel(channel);
       channelRef.current = null;
+      setMessages([]);
     };
   }, [sessionId, userId]);
 
@@ -398,6 +423,7 @@ export default function ChatScreen() {
 
   function handleDraftChange(text: string) {
     setDraft(text);
+    if (sendError) setSendError('');
     if (!channelRef.current) return;
     void channelRef.current.send({ type: 'broadcast', event: 'typing', payload: { isTyping: true } });
     if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
@@ -411,14 +437,26 @@ export default function ChatScreen() {
     if (!text) return;
     if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
     void channelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { isTyping: false } });
-    setDraft('');
-    const { isSafe, isCrisis } = await moderateMessage(text);
-    if (isCrisis) { setCrisisOpen(true); return; }
-    if (!isSafe) return;
-    if (!channelRef.current) return;
-    await channelRef.current.send({ type: 'broadcast', event: 'message', payload: { text, ts: formatClock() } });
-    setMessages(prev => [...prev, { id: Date.now(), from: 'me', text, time: formatClock() }]);
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    setSendError('');
+    try {
+      const { isSafe, isCrisis } = await moderateMessage(text);
+      if (isCrisis) { setCrisisOpen(true); return; }
+      if (!isSafe) {
+        setSendError('That message cannot be sent. Try rephrasing it kindly and safely.');
+        return;
+      }
+      if (!channelRef.current) {
+        setSendError('You are not connected to the conversation. Try again in a moment.');
+        return;
+      }
+      const sentAt = formatClock();
+      await channelRef.current.send({ type: 'broadcast', event: 'message', payload: { text, ts: sentAt } });
+      setDraft('');
+      setMessages(prev => [...prev, { id: Date.now(), from: 'me', text, time: sentAt }]);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch {
+      setSendError('Message could not be sent. Check your connection and try again.');
+    }
   }
 
   async function handleContinueAgree() {
@@ -585,8 +623,16 @@ export default function ChatScreen() {
               <Text style={{ fontSize: 16, color: draft.trim() ? t.bg : t.ink4 }}>↑</Text>
             </TouchableOpacity>
           </View>
+          {!!sendError && (
+            <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 11.5, color: t.red, lineHeight: 16 }}>
+              {sendError}
+            </Text>
+          )}
           <Text style={{ marginTop: 10, textAlign: 'center', fontSize: 10, color: t.ink5, letterSpacing: 0.5 }}>
-            END-TO-END ENCRYPTED · NOT RECORDED
+            REAL-TIME ANONYMOUS CHAT
+          </Text>
+          <Text style={{ marginTop: 4, textAlign: 'center', fontSize: 10, color: t.ink5, letterSpacing: 0.2 }}>
+            Messages are not saved after the session
           </Text>
         </View>
       </KeyboardAvoidingView>

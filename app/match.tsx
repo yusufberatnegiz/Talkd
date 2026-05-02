@@ -63,18 +63,18 @@ function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: stri
   const t = useTheme();
   const router = useRouter();
   const [note, setNote] = useState(specific);
-  const [sent, setSent] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
 
-  if (sent) {
+  if (unavailable) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: hue, marginBottom: 28 }} />
           <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 32, lineHeight: 38, letterSpacing: -0.3, color: t.ink, textAlign: 'center' }}>
-            Your note is out there.
+            Async notes are not ready yet.
           </Text>
           <Text style={{ fontSize: 13.5, color: t.ink3, marginTop: 14, lineHeight: 20, textAlign: 'center', maxWidth: 280 }}>
-            We'll nudge you the moment someone opens it.
+            We did not send or save this note. You can keep looking now, or come back later.
           </Text>
           <View style={{
             marginTop: 30, padding: 16, backgroundColor: t.bg2,
@@ -85,11 +85,18 @@ function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: stri
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => router.replace('/(tabs)')}
+            onPress={onBack}
             style={{ marginTop: 32, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 99, backgroundColor: hue }}
             activeOpacity={0.85}
           >
-            <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.bg }}>Go home</Text>
+            <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.bg }}>Keep looking</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.replace('/(tabs)')}
+            style={{ marginTop: 12, paddingVertical: 14, paddingHorizontal: 32 }}
+            activeOpacity={0.85}
+          >
+            <Text style={{ fontSize: 14.5, fontWeight: '500', color: t.ink3 }}>Go home</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -131,11 +138,11 @@ function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: stri
       <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}>
         <TouchableOpacity
           disabled={!note.trim()}
-          onPress={() => setSent(true)}
+          onPress={() => setUnavailable(true)}
           style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: note.trim() ? hue : t.bg3 }}
         >
           <Text style={{ fontSize: 15, fontWeight: '600', color: note.trim() ? t.bg : t.ink4 }}>
-            Send into the quiet
+            Check async availability
           </Text>
         </TouchableOpacity>
       </View>
@@ -476,7 +483,7 @@ export default function MatchScreen() {
               Neither of you will know who the other is.
             </Text>
             <Text style={{ fontSize: 11, color: t.ink3, marginTop: 2, lineHeight: 15 }}>
-              10–15 min session · ends when the timer runs out · nothing saved
+              Real-time anonymous chat · messages are not saved after the session
             </Text>
           </View>
         </View>

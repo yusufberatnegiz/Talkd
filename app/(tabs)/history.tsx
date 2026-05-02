@@ -28,10 +28,10 @@ export default function HistoryScreen() {
         {/* Header */}
         <View style={{ paddingHorizontal: 28, paddingTop: 48, paddingBottom: 20 }}>
           <Text style={{ fontSize: 11, letterSpacing: 2.2, color: t.ink4, textTransform: 'uppercase', marginBottom: 14 }}>
-            Your journey
+            Past sessions
           </Text>
           <Text style={{ fontFamily: 'Georgia', fontSize: 40, lineHeight: 44, letterSpacing: -0.8, color: t.ink }}>
-            History
+            Session activity
           </Text>
         </View>
 
@@ -64,12 +64,12 @@ export default function HistoryScreen() {
         {/* Empty state */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 }}>
           <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: t.ink4, textAlign: 'center' }}>
-            Your conversations will appear here.
+            Session metadata and ratings will appear here.
           </Text>
         </View>
       </ScrollView>
 
-      <BottomNav active="History" />
+      <BottomNav active="Activity" />
     </SafeAreaView>
   );
 }

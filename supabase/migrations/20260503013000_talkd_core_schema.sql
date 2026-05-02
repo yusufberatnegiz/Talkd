@@ -295,7 +295,8 @@ as $$
   );
 $$;
 
-create or replace view public.session_ratings_public as
+drop view if exists public.session_ratings_public;
+create view public.session_ratings_public as
 select
   rated_user_id,
   round(avg(stars)::numeric, 2) as avg_stars,

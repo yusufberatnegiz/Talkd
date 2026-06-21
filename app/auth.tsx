@@ -8,6 +8,58 @@ import { useTheme } from '@/hooks/useTheme';
 
 type Mode = 'signin' | 'signup';
 
+const EMAIL_PATTERN = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+const TURKISH_LETTER_PATTERN = /[çğıöşüÇĞİÖŞÜ]/;
+const NON_ASCII_PATTERN = /[^\x20-\x7E]/;
+
+function validateEmail(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return 'Enter your email address.';
+  if (/\s/.test(trimmed)) return 'Email cannot contain spaces.';
+  if (TURKISH_LETTER_PATTERN.test(trimmed)) {
+    return 'Use an email with English letters only. Turkish characters like ç, ğ, ı, ö, ş, or ü are not supported for sign in.';
+  }
+  if (NON_ASCII_PATTERN.test(trimmed)) {
+    return 'Use an email with standard English letters, numbers, and symbols only.';
+  }
+  if (!EMAIL_PATTERN.test(trimmed)) return 'Enter a valid email address, like name@example.com.';
+  return null;
+}
+
+function validatePassword(value: string, mode: Mode): string | null {
+  if (!value) return 'Enter your password.';
+  if (mode === 'signup' && value.length < 6) return 'Password must be at least 6 characters.';
+  return null;
+}
+
+function getAuthErrorMessage(message: string, mode: Mode): string {
+  const m = message.toLowerCase();
+  if (m.includes('invalid login credentials')) {
+    return 'We could not sign you in. Check your email and password.';
+  }
+  if (m.includes('email not confirmed')) {
+    return 'Please confirm your email address before signing in.';
+  }
+  if (m.includes('already registered') || m.includes('already exists') || m.includes('user already registered')) {
+    return 'An account already exists for this email. Switch to sign in instead.';
+  }
+  if (m.includes('password') && (m.includes('six') || m.includes('6') || m.includes('short'))) {
+    return 'Password must be at least 6 characters.';
+  }
+  if (m.includes('invalid') && m.includes('email')) {
+    return 'Enter a valid email address, like name@example.com.';
+  }
+  if (m.includes('rate limit') || m.includes('too many')) {
+    return 'Too many attempts. Please wait a moment and try again.';
+  }
+  if (m.includes('network') || m.includes('fetch')) {
+    return 'Could not connect. Check your internet connection and try again.';
+  }
+  return mode === 'signup'
+    ? 'Could not create your account. Check the details and try again.'
+    : 'Could not sign you in. Check the details and try again.';
+}
+
 export default function AuthScreen() {
   const t = useTheme();
   const router = useRouter();
@@ -25,11 +77,15 @@ export default function AuthScreen() {
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [AppleAuthentication.AppleAuthenticationScope.EMAIL],
       });
+      if (!credential.identityToken) {
+        setError('Apple did not return a sign-in token. Please try again.');
+        return;
+      }
       const { error: authError } = await supabase.auth.signInWithIdToken({
         provider: 'apple',
-        token: credential.identityToken!,
+        token: credential.identityToken,
       });
-      if (authError) setError(authError.message);
+      if (authError) setError('Apple sign in could not be completed. Please try again.');
     } catch (e: unknown) {
       const err = e as { code?: string };
       if (err.code !== 'ERR_REQUEST_CANCELED') setError('Apple sign in failed.');
@@ -37,15 +93,28 @@ export default function AuthScreen() {
   }
 
   async function handleEmail() {
-    if (!email.trim() || !password) { setError('Enter your email and password.'); return; }
+    const cleanEmail = email.trim().toLowerCase();
+    const emailError = validateEmail(email);
+    if (emailError) { setError(emailError); return; }
+    const passwordError = validatePassword(password, mode);
+    if (passwordError) { setError(passwordError); return; }
     setLoading(true);
     setError('');
-    const { error: authError } = mode === 'signup'
-      ? await supabase.auth.signUp({ email: email.trim(), password })
-      : await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setLoading(false);
-    if (authError) { setError(authError.message); return; }
-    router.replace('/(tabs)');
+    try {
+      const { data, error: authError } = mode === 'signup'
+        ? await supabase.auth.signUp({ email: cleanEmail, password })
+        : await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+      if (authError) { setError(getAuthErrorMessage(authError.message, mode)); return; }
+      if (mode === 'signup' && !data.session) {
+        setError('Account created. Check your email to confirm it before signing in.');
+        return;
+      }
+      router.replace('/(tabs)');
+    } catch {
+      setError('Could not connect. Check your internet connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const inputStyle = {

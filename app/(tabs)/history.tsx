@@ -1,4 +1,5 @@
 import { BottomNav } from '@/components/BottomNav';
+import { formatFeedbackBadge, useReceivedFeedback } from '@/hooks/useReceivedFeedback';
 import { useTheme } from '@/hooks/useTheme';
 import { useUserStats } from '@/hooks/useUserStats';
 import { ScrollView, Text, View } from 'react-native';
@@ -13,6 +14,7 @@ function formatTime(minutes: number): string {
 export default function HistoryScreen() {
   const t = useTheme();
   const { stats, loading } = useUserStats();
+  const { byTopic, recent, loading: feedbackLoading } = useReceivedFeedback();
 
   const dash = '—';
   const statRows = [
@@ -20,6 +22,8 @@ export default function HistoryScreen() {
     { v: loading ? dash : stats.avgRating !== null ? String(stats.avgRating) : dash, l: 'Avg rating' },
     { v: loading ? dash : formatTime(stats.totalMinutes), l: 'Total time' },
   ];
+  const feedbackDash = '-';
+  const hasFeedback = byTopic.length > 0 || recent.length > 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
@@ -61,12 +65,104 @@ export default function HistoryScreen() {
           </View>
         </View>
 
-        {/* Empty state */}
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 }}>
-          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: t.ink4, textAlign: 'center' }}>
-            Session metadata and ratings will appear here.
+        {/* Rating feedback by category */}
+        <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 1.4, color: t.ink4, textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>
+            By category
           </Text>
+          {feedbackLoading ? (
+            <View style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, padding: 18 }}>
+              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: t.ink4, textAlign: 'center' }}>
+                Loading feedback...
+              </Text>
+            </View>
+          ) : byTopic.length > 0 ? (
+            <View style={{ gap: 8 }}>
+              {byTopic.map(item => (
+                <View
+                  key={item.topicKey}
+                  style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, padding: 14 }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.hue }} />
+                    <Text style={{ flex: 1, fontSize: 14.5, fontWeight: '600', color: t.ink }}>
+                      {item.topicLabel}
+                    </Text>
+                    <Text style={{ fontFamily: 'Georgia', fontSize: 18, fontWeight: '600', color: t.ink }}>
+                      {item.avgStars !== null ? `${item.avgStars}/5` : feedbackDash}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                    <Text style={{ fontSize: 12, color: t.ink4 }}>
+                      {item.ratingCount} {item.ratingCount === 1 ? 'rating' : 'ratings'}
+                    </Text>
+                    {item.topBadge ? (
+                      <Text style={{ fontSize: 12, color: t.ink3 }}>
+                        Top badge: {item.topBadge}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, padding: 18 }}>
+              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: t.ink4, textAlign: 'center' }}>
+                Category ratings will appear after people rate your sessions.
+              </Text>
+            </View>
+          )}
         </View>
+
+        {/* Recent feedback */}
+        <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 1.4, color: t.ink4, textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>
+            Recent anonymous feedback
+          </Text>
+          {feedbackLoading ? null : recent.length > 0 ? (
+            <View style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, overflow: 'hidden' }}>
+              {recent.map((item, index) => {
+                const badge = formatFeedbackBadge(item.badge);
+                return (
+                  <View
+                    key={item.id}
+                    style={[
+                      { padding: 14 },
+                      index < recent.length - 1 ? { borderBottomWidth: 0.5, borderBottomColor: t.line } : undefined,
+                    ]}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.hue }} />
+                      <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: t.ink }}>
+                        {item.topicLabel}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: t.ink3 }}>
+                        {item.stars !== null ? `${item.stars}/5` : feedbackDash}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: t.ink4, marginTop: 6 }}>
+                      {badge ? `Badge: ${badge}` : 'No badge selected'}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, padding: 18 }}>
+              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: t.ink4, textAlign: 'center' }}>
+                Recent feedback will appear here without names or exact session details.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {!feedbackLoading && !hasFeedback && (
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingTop: 28 }}>
+            <Text style={{ fontSize: 12.5, color: t.ink5, textAlign: 'center', lineHeight: 18 }}>
+              Ratings are grouped by topic so feedback stays anonymous.
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       <BottomNav active="Activity" />

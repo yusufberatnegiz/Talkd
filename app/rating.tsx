@@ -25,16 +25,19 @@ const STAR_LABELS = ['', 'Not great', 'Okay', 'Good', 'Really helpful', 'The bes
 export default function RatingScreen() {
   const t = useTheme();
   const router = useRouter();
-  const { topic: topicParam, session_id: sessionId, other_user_id: otherUserId } = useLocalSearchParams<{
-    topic?: string; session_id?: string; other_user_id?: string;
+  const { topic: topicParam, session_id: sessionId, other_user_id: otherUserId, my_role: myRole } = useLocalSearchParams<{
+    topic?: string; session_id?: string; other_user_id?: string; my_role?: string;
   }>();
   const tp = getTopic(topicParam ?? 'any');
+  const ratedRole = myRole === 'listener' ? 'talker' : 'listener';
 
   const [userId, setUserId] = useState<string | null>(null);
   const [stars, setStars] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -51,8 +54,19 @@ export default function RatingScreen() {
   }, [isPositive]);
 
   async function handleSubmit() {
-    if (userId && sessionId && otherUserId) {
-      await supabase.from('session_ratings').insert({
+    const hasFeedback = stars > 0 || picked !== null || note.trim().length > 0;
+    if (!hasFeedback) {
+      setSubmitted(true);
+      return;
+    }
+    if (!userId || !sessionId || !otherUserId) {
+      setError('Your rating could not be saved because this session is missing details.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      const { error: ratingError } = await supabase.from('session_ratings').insert({
         session_id: sessionId,
         rater_id: userId,
         rated_user_id: otherUserId,
@@ -60,11 +74,20 @@ export default function RatingScreen() {
         badge: picked,
         private_note: note.trim() || null,
       });
+      if (ratingError) {
+        setError('Your rating could not be saved. Check your connection and try again.');
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setError('Your rating could not be saved. Check your connection and try again.');
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitted(true);
   }
 
   const handleStars = (n: number) => {
+    if (error) setError('');
     setStars(n);
   };
 
@@ -107,7 +130,7 @@ export default function RatingScreen() {
             <Text style={{ fontStyle: 'italic', color: tp.hue }}>it?</Text>
           </Text>
           <Text style={{ fontSize: 13, color: t.ink3, marginTop: 10, lineHeight: 19 }}>
-            Rate the listener and pick one badge. Your rating stays anonymous — it just helps good people stay on talkd.
+            Rate the {ratedRole} and pick one badge. Your rating stays anonymous - it just helps good people stay on talkd.
           </Text>
         </View>
 
@@ -152,7 +175,7 @@ export default function RatingScreen() {
             return (
               <TouchableOpacity
                 key={b.k}
-                onPress={() => setPicked(b.k)}
+                onPress={() => { setPicked(b.k); if (error) setError(''); }}
                 style={{
                   width: '48%', padding: 14, borderRadius: 14,
                   backgroundColor: active ? b.color + '20' : t.bg3,
@@ -177,7 +200,7 @@ export default function RatingScreen() {
         </Text>
         <TextInput
           value={note}
-          onChangeText={setNote}
+          onChangeText={text => { setNote(text); if (error) setError(''); }}
           placeholder="What do you want to remember…"
           placeholderTextColor={t.ink4}
           multiline
@@ -191,14 +214,20 @@ export default function RatingScreen() {
 
         {/* Submit */}
         <TouchableOpacity
+          disabled={submitting}
           onPress={() => void handleSubmit()}
-          style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: t.amber }}
+          style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: submitting ? t.bg3 : t.amber }}
           activeOpacity={0.85}
         >
-          <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.bg, letterSpacing: -0.1 }}>
-            {stars || picked ? 'Send & close' : 'Skip & close'}
+          <Text style={{ fontSize: 14.5, fontWeight: '600', color: submitting ? t.ink4 : t.bg, letterSpacing: -0.1 }}>
+            {submitting ? 'Saving...' : stars || picked || note.trim() ? 'Send & close' : 'Skip & close'}
           </Text>
         </TouchableOpacity>
+        {!!error && (
+          <Text style={{ textAlign: 'center', fontSize: 12, color: t.red, marginTop: 10, lineHeight: 18 }}>
+            {error}
+          </Text>
+        )}
         <Text style={{ textAlign: 'center', fontSize: 10.5, color: t.ink5, marginTop: 10, letterSpacing: 0.4 }}>
           THEY'RE RATING YOU TOO. NEITHER OF YOU SEES THE OTHER'S RATING.
         </Text>

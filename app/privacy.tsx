@@ -51,9 +51,9 @@ export default function PrivacyScreen() {
             style={{ paddingHorizontal: 20, paddingVertical: 18 }}
             activeOpacity={0.7}
           >
-            <Text style={{ fontSize: 15, fontWeight: '500', color: t.ink }}>Export my data</Text>
+            <Text style={{ fontSize: 15, fontWeight: '500', color: t.ink }}>Data export</Text>
             <Text style={{ fontSize: 12.5, color: t.ink3, marginTop: 3 }}>
-              Download a copy of your session activity and ratings.
+              Coming soon for session activity, ratings, and safety records.
             </Text>
           </TouchableOpacity>
           {exportMessage && (

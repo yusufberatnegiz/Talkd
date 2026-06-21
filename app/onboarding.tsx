@@ -1,5 +1,8 @@
 import { TOPICS } from '@/constants/topics';
+import { SESSION_DURATION_SECONDS } from '@/constants/config';
 import { useTheme } from '@/hooks/useTheme';
+import { markSafetyGuidelinesAccepted } from '@/lib/safetyAcceptance';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Text, TouchableOpacity, View } from 'react-native';
@@ -143,6 +146,9 @@ export default function OnboardingScreen() {
   const t = useTheme();
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState('');
+  const sessionMinutes = Math.round(SESSION_DURATION_SECONDS / 60);
 
   const steps = [
     {
@@ -150,7 +156,7 @@ export default function OnboardingScreen() {
       before: "You're not ",
       italic: 'alone.',
       accentColor: t.amber,
-      body: 'talkd connects you with a real stranger, right now, for 10-15 minutes. Real-time anonymous chat. Messages are not saved after the session.',
+      body: `talkd connects you with a real stranger, right now, for ${sessionMinutes} minutes. Real-time anonymous chat. Messages are not saved after the session.`,
       cta: 'Ok',
     },
     {
@@ -173,6 +179,30 @@ export default function OnboardingScreen() {
 
   const s = steps[step];
   const isLast = step === steps.length - 1;
+
+  async function handleNext() {
+    if (!isLast) {
+      setStep(step + 1);
+      return;
+    }
+
+    setAcceptError('');
+    setAccepting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.replace('/auth' as never);
+        return;
+      }
+
+      await markSafetyGuidelinesAccepted();
+      router.replace('/(tabs)' as never);
+    } catch {
+      setAcceptError('Could not save your safety agreement. Check your connection and try again.');
+    } finally {
+      setAccepting(false);
+    }
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
@@ -205,6 +235,11 @@ export default function OnboardingScreen() {
         <Text style={{ fontSize: 14.5, color: t.ink3, marginTop: 14, lineHeight: 22, maxWidth: 320 }}>
           {s.body}
         </Text>
+        {!!acceptError && (
+          <Text style={{ fontSize: 12.5, color: t.red, marginTop: 12, lineHeight: 18 }}>
+            {acceptError}
+          </Text>
+        )}
       </View>
 
       {/* CTAs */}
@@ -221,11 +256,14 @@ export default function OnboardingScreen() {
           </TouchableOpacity>
         )}
         <TouchableOpacity
-          onPress={() => isLast ? router.replace('/auth' as never) : setStep(step + 1)}
-          style={{ flex: 1, paddingVertical: 16, backgroundColor: t.amber, borderRadius: 99, alignItems: 'center' }}
+          onPress={() => void handleNext()}
+          disabled={accepting}
+          style={{ flex: 1, paddingVertical: 16, backgroundColor: accepting ? t.bg3 : t.amber, borderRadius: 99, alignItems: 'center' }}
           activeOpacity={0.85}
         >
-          <Text style={{ fontSize: 15, fontWeight: '600', color: t.bg, letterSpacing: -0.1 }}>{s.cta}</Text>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: accepting ? t.ink4 : t.bg, letterSpacing: -0.1 }}>
+            {accepting ? 'Saving...' : s.cta}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

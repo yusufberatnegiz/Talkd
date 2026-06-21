@@ -76,6 +76,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { preference: appearance } = useAppearance();
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
 
   const MENU: MenuSection[] = [
     {
@@ -109,7 +110,12 @@ export default function ProfileScreen() {
   ];
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    setSignOutError('');
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setSignOutError('Could not sign out. Check your connection and try again.');
+      return;
+    }
     router.replace('/auth');
   }
 
@@ -227,6 +233,11 @@ export default function ProfileScreen() {
           <View style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, overflow: 'hidden' }}>
             <Row icon={LogOut} label="Sign out" destructive onPress={handleSignOut} />
           </View>
+          {!!signOutError && (
+            <Text style={{ marginTop: 10, textAlign: 'center', fontSize: 12, color: t.red, lineHeight: 18 }}>
+              {signOutError}
+            </Text>
+          )}
           <Text style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: t.ink4 }}>
             Talkd · v1.0.0
           </Text>

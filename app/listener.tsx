@@ -1,53 +1,12 @@
 import { BottomNav } from '@/components/BottomNav';
 import { TOPICS } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
+import { cancelMatchQueue, findOrCreateMatch } from '@/lib/matching';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-interface SeekingPayload {
-  userId: string;
-  intent: string;
-  specific: string;
-}
-
-interface MatchedPayload {
-  session_id: string;
-  topic: string;
-  toId: string;
-  matched_user_intent: string;
-  other_user_id: string;
-  specific: string;
-}
-
-async function createSession(input: {
-  topic: string;
-  specific: string;
-  listenerId: string;
-  talkerId: string;
-  talkerIntent: string;
-}): Promise<string> {
-  const { data, error } = await supabase
-    .from('sessions')
-    .insert({
-      topic: input.topic,
-      specific: input.specific || null,
-      participant_a: input.listenerId,
-      participant_b: input.talkerId,
-      intent_a: 'listen',
-      intent_b: input.talkerIntent,
-    })
-    .select('id')
-    .single();
-
-  if (error || !data?.id) {
-    throw new Error('Session could not be created.');
-  }
-
-  return data.id as string;
-}
 
 export default function ListenerScreen() {
   const t = useTheme();
@@ -56,13 +15,11 @@ export default function ListenerScreen() {
   const [topicFilter, setTopicFilter] = useState<string[]>([]);
   const [matched, setMatched] = useState(false);
   const [topicError, setTopicError] = useState('');
-
   const [userId, setUserId] = useState<string | null>(null);
   const [badgeCount, setBadgeCount] = useState<number | null>(null);
-  const channelsRef = useRef<ReturnType<typeof supabase.channel>[]>([]);
-  const matchedRef = useRef(false);
-  const removalPromiseRef = useRef<Promise<unknown>>(Promise.resolve());
 
+  const matchedRef = useRef(false);
+  const topicIndexRef = useRef(0);
   const topicsArr = Object.values(TOPICS);
 
   useEffect(() => {
@@ -80,124 +37,68 @@ export default function ListenerScreen() {
     });
   }, []);
 
-  function cleanupChannels() {
-    if (channelsRef.current.length > 0) {
-      removalPromiseRef.current = Promise.all(
-        channelsRef.current.map(ch => supabase.removeChannel(ch))
-      );
-      channelsRef.current = [];
-    }
-  }
-
   useEffect(() => {
-    if (!online || !userId || topicFilter.length === 0) {
-      cleanupChannels();
-      return;
-    }
+    if (!online || !userId || topicFilter.length === 0 || matchedRef.current) return;
 
     let isCancelled = false;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-    async function setup() {
-      await removalPromiseRef.current;  // wait for any in-flight removal from previous cleanup
-      if (isCancelled) return;
+    async function poll() {
+      if (matchedRef.current || topicFilter.length === 0) return;
 
-      matchedRef.current = false;
+      const topicKey = topicFilter[topicIndexRef.current % topicFilter.length];
+      topicIndexRef.current += 1;
 
-      topicFilter.forEach(topicKey => {
-        const channel = supabase.channel(`match-queue:${topicKey}:listener`, {
-          config: { broadcast: { self: false } },
+      try {
+        const result = await findOrCreateMatch({
+          topic: topicKey,
+          specific: '',
+          intent: 'listen',
+          role: 'listener',
+          allowTalkerFallback: false,
         });
 
-        channel
-          .on('broadcast', { event: 'seeking' }, ({ payload }: { payload: SeekingPayload }) => {
-            if (matchedRef.current || payload.userId === userId) return;
-            if (userId! < payload.userId) {
-              void handleMatchAsLower(payload, channel, userId!, topicKey);
-            } else {
-              void channel.send({
-                type: 'broadcast', event: 'match-offer',
-                payload: { fromId: userId!, toId: payload.userId, intent: 'listen', specific: payload.specific },
-              });
-            }
-          })
-          .on('broadcast', { event: 'matched' }, ({ payload }: { payload: MatchedPayload }) => {
-            if (matchedRef.current || payload.toId !== userId) return;
-            matchedRef.current = true;
-            cleanupChannels();
-            setMatched(true);
-            setTimeout(() => {
-              router.replace({
-                pathname: '/chat',
-                params: {
-                  session_id: payload.session_id,
-                  topic: payload.topic,
-                  specific: payload.specific,
-                  other_user_id: payload.other_user_id,
-                  my_role: 'listener',
-                  specific_from: 'them',
-                },
-              } as never);
-            }, 1500);
-          })
-          .subscribe(() => { /* broadcast-only */ });
+        if (isCancelled || matchedRef.current || !result.matched) return;
+        if (!result.sessionId || !result.otherUserId) {
+          setTopicError('Could not open the matched session. Try going on duty again.');
+          return;
+        }
 
-        channelsRef.current.push(channel);
-      });
+        matchedRef.current = true;
+        setMatched(true);
+        setTopicError('');
+        if (pollTimer) clearInterval(pollTimer);
+
+        setTimeout(() => {
+          router.replace({
+            pathname: '/chat',
+            params: {
+              session_id: result.sessionId,
+              topic: topicKey,
+              specific: result.otherSpecific ?? '',
+              other_user_id: result.otherUserId,
+              my_role: 'listener',
+              specific_from: 'them',
+            },
+          } as never);
+        }, 1500);
+      } catch (error: unknown) {
+        console.error('Listener match polling failed', error);
+        if (!isCancelled) {
+          setTopicError('Could not search for a match. Try going on duty again.');
+        }
+      }
     }
 
-    void setup();
+    void poll();
+    pollTimer = setInterval(() => void poll(), 4000);
 
-    return () => { isCancelled = true; cleanupChannels(); };
-  }, [online, topicFilter, userId]);
-
-  async function handleMatchAsLower(
-    other: SeekingPayload,
-    channel: ReturnType<typeof supabase.channel>,
-    uid: string,
-    topicKey: string,
-  ) {
-    if (matchedRef.current) return;
-    matchedRef.current = true;
-
-    try {
-      const sessionId = await createSession({
-        topic: topicKey,
-        specific: other.specific,
-        listenerId: uid,
-        talkerId: other.userId,
-        talkerIntent: other.intent,
-      });
-      const matchedPayload: MatchedPayload = {
-        session_id: sessionId,
-        topic: topicKey,
-        toId: other.userId,
-        matched_user_intent: other.intent,
-        other_user_id: uid,
-        specific: other.specific,
-      };
-
-      await channel.send({ type: 'broadcast', event: 'matched', payload: matchedPayload });
-      cleanupChannels();
-      setMatched(true);
-      setTimeout(() => {
-        router.replace({
-          pathname: '/chat',
-          params: {
-            session_id: sessionId,
-            topic: topicKey,
-            specific: other.specific,
-            other_user_id: other.userId,
-            my_role: 'listener',
-            specific_from: 'them',
-          },
-        } as never);
-      }, 1500);
-    } catch {
-      matchedRef.current = false;
-      setMatched(false);
-      setTopicError('Could not create the session. Try going on duty again.');
-    }
-  }
+    return () => {
+      isCancelled = true;
+      if (pollTimer) clearInterval(pollTimer);
+      if (!matchedRef.current) void cancelMatchQueue();
+    };
+  }, [online, userId, topicFilter, router]);
 
   const toggleTopic = (k: string) => {
     setTopicError('');
@@ -211,6 +112,12 @@ export default function ListenerScreen() {
       return;
     }
     setTopicError('');
+    if (online) {
+      void cancelMatchQueue();
+    } else {
+      matchedRef.current = false;
+      topicIndexRef.current = 0;
+    }
     setOnline(o => !o);
   };
 
@@ -221,10 +128,9 @@ export default function ListenerScreen() {
         contentContainerStyle={{ paddingBottom: 8 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top bar */}
         <View style={{ paddingHorizontal: 24, paddingTop: 14, flexDirection: 'row', justifyContent: 'space-between' }}>
           <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 18, color: t.ink3 }}>
-            talkd · listener
+            talkd - listener
           </Text>
           {badgeCount !== null && badgeCount > 0 && (
             <Text style={{ fontSize: 11, color: t.ink4, letterSpacing: 1.5, textTransform: 'uppercase' }}>
@@ -233,7 +139,6 @@ export default function ListenerScreen() {
           )}
         </View>
 
-        {/* Headline */}
         <View style={{ paddingHorizontal: 28, paddingTop: 40, paddingBottom: 20 }}>
           <Text style={{ fontSize: 11, letterSpacing: 2.2, color: t.ink4, textTransform: 'uppercase', marginBottom: 14 }}>
             Tonight you are
@@ -257,18 +162,23 @@ export default function ListenerScreen() {
           <TouchableOpacity
             onPress={handleDutyToggle}
             style={{
-              marginTop: 24, paddingVertical: 13, paddingHorizontal: 22,
+              marginTop: 24,
+              paddingVertical: 13,
+              paddingHorizontal: 22,
               borderRadius: 99,
               backgroundColor: online ? t.amber : 'transparent',
-              borderWidth: online ? 0 : 1, borderColor: t.lineStrong,
+              borderWidth: online ? 0 : 1,
+              borderColor: t.lineStrong,
               alignSelf: 'flex-start',
-              flexDirection: 'row', alignItems: 'center', gap: 10,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
             }}
             activeOpacity={0.85}
           >
             {online && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.bg }} />}
             <Text style={{ fontSize: 14, fontWeight: '500', color: online ? t.bg : t.ink }}>
-              {matched ? 'Connecting…' : online ? 'Live — tap to pause' : 'Go on duty'}
+              {matched ? 'Connecting...' : online ? 'Live - tap to pause' : 'Go on duty'}
             </Text>
           </TouchableOpacity>
           {!!topicError && (
@@ -278,7 +188,6 @@ export default function ListenerScreen() {
           )}
         </View>
 
-        {/* Topic filter */}
         <View style={{ paddingHorizontal: 20 }}>
           <Text style={{ fontSize: 11, letterSpacing: 2, color: t.ink4, textTransform: 'uppercase', marginBottom: 10, paddingLeft: 4 }}>
             Match me with
@@ -291,7 +200,9 @@ export default function ListenerScreen() {
                   key={tp.key}
                   onPress={() => toggleTopic(tp.key)}
                   style={{
-                    paddingVertical: 7, paddingHorizontal: 12, borderRadius: 99,
+                    paddingVertical: 7,
+                    paddingHorizontal: 12,
+                    borderRadius: 99,
                     backgroundColor: active ? tp.hue + '28' : 'transparent',
                     borderWidth: active ? 1 : 0.5,
                     borderColor: active ? tp.hue + '80' : t.lineStrong,
@@ -308,7 +219,7 @@ export default function ListenerScreen() {
         {online && !matched && (
           <View style={{ paddingHorizontal: 40, paddingTop: 32, alignItems: 'center' }}>
             <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 16, color: t.ink3, textAlign: 'center' }}>
-              waiting for someone on your wavelength…
+              waiting for someone on your wavelength...
             </Text>
           </View>
         )}

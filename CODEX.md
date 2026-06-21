@@ -52,3 +52,7 @@ npx.cmd supabase gen types typescript --local > types/supabase.ts
 - Patterns -> `agent_docs/code_patterns.md`
 - Features -> `agent_docs/product_requirements.md`
 - Testing -> `agent_docs/testing.md`
+
+- Do not expose OpenAI keys in client code.
+- Do not claim end-to-end encryption unless real E2EE exists.
+- Current priority is stabilization/safety before Phone OTP.

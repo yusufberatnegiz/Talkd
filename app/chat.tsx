@@ -18,10 +18,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface Message {
-  id: number;
+  id: string;
   from: 'me' | 'them';
   text: string;
   time: string;
+}
+
+interface SessionAccessRow {
+  participant_a: string | null;
+  participant_b: string | null;
+  status: string | null;
 }
 
 function Sheet({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
@@ -300,10 +306,10 @@ export default function ChatScreen() {
 
   const {
     topic: topicParam, specific, specific_from,
-    session_id: sessionId, other_user_id: otherUserId,
+    session_id: sessionId, other_user_id: otherUserId, my_role: myRole,
   } = useLocalSearchParams<{
     topic: string; specific: string; specific_from: string;
-    session_id: string; other_user_id: string;
+    session_id: string; other_user_id: string; my_role?: string;
   }>();
   const tp = getTopic(topicParam ?? 'any');
   const hue = tp.hue;
@@ -322,6 +328,10 @@ export default function ChatScreen() {
   const [crisisOpen, setCrisisOpen] = useState(false);
   const [typing, setTyping] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [sending, setSending] = useState(false);
+  const [joinError, setJoinError] = useState('');
+  const [sessionOtherUserId, setSessionOtherUserId] = useState<string | null>(null);
+  const sendingRef = useRef(false);
 
   function formatClock() {
     const d = new Date();
@@ -332,6 +342,14 @@ export default function ChatScreen() {
 
   function formatTime(s: number) {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  function createMessageId(): string {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID();
+    }
+
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
   // Load user ID
@@ -345,40 +363,79 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!sessionId || !userId) return;
 
-    const channel = supabase.channel(`session:${sessionId}`, {
-      config: { broadcast: { self: false } },
-    });
+    let isCancelled = false;
 
-    channel
-      .on('broadcast', { event: 'message' }, ({ payload }: { payload: { text: string; ts: string } }) => {
-        setMessages(prev => [...prev, { id: Date.now(), from: 'them', text: payload.text, time: payload.ts }]);
-        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-      })
-      .on('broadcast', { event: 'continue_agree' }, () => {
-        setTheyAgreed(true);
-      })
-      .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { isTyping: boolean } }) => {
-        setTyping(payload.isTyping);
-      })
-      .on('broadcast', { event: 'session_end' }, () => {
-        if (channelRef.current) {
-          void supabase.removeChannel(channelRef.current);
-          channelRef.current = null;
-        }
-        setMessages([]);
-        setTimeout(() => {
-          router.replace({
-            pathname: '/rating',
-            params: { topic: tp.key, session_id: sessionId, other_user_id: otherUserId ?? '' },
-          } as never);
-        }, 700);
-      })
-      .subscribe();
+    async function setupChannel() {
+      setJoinError('');
+      setSessionOtherUserId(null);
 
-    channelRef.current = channel;
+      const { data, error } = await supabase
+        .from('sessions')
+        .select('participant_a,participant_b,status')
+        .eq('id', sessionId)
+        .maybeSingle();
+
+      if (isCancelled) return;
+
+      const session = data as SessionAccessRow | null;
+      const isParticipant = session?.participant_a === userId || session?.participant_b === userId;
+      const verifiedOtherUserId = session?.participant_a === userId
+        ? session?.participant_b
+        : session?.participant_a;
+
+      if (error || !session || !isParticipant || !verifiedOtherUserId) {
+        setJoinError('This conversation is no longer available.');
+        return;
+      }
+
+      if (session.status && session.status !== 'active') {
+        setJoinError('This conversation has already ended.');
+        return;
+      }
+
+      setSessionOtherUserId(verifiedOtherUserId);
+
+      const channel = supabase.channel(`session:${sessionId}`, {
+        config: { broadcast: { self: false } },
+      });
+
+      channel
+        .on('broadcast', { event: 'message' }, ({ payload }: { payload: { id?: string; text: string; ts: string } }) => {
+          setMessages(prev => [...prev, { id: payload.id ?? createMessageId(), from: 'them', text: payload.text, time: payload.ts }]);
+          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+        })
+        .on('broadcast', { event: 'continue_agree' }, () => {
+          setTheyAgreed(true);
+        })
+        .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { isTyping: boolean } }) => {
+          setTyping(payload.isTyping);
+        })
+        .on('broadcast', { event: 'session_end' }, () => {
+          if (channelRef.current) {
+            void supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
+          }
+          setMessages([]);
+          setTimeout(() => {
+            router.replace({
+              pathname: '/rating',
+              params: { topic: tp.key, session_id: sessionId, other_user_id: verifiedOtherUserId, my_role: myRole ?? '' },
+            } as never);
+          }, 700);
+        })
+        .subscribe();
+
+      channelRef.current = channel;
+    }
+
+    void setupChannel();
+
     return () => {
+      isCancelled = true;
       if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
-      void supabase.removeChannel(channel);
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current);
+      }
       channelRef.current = null;
       setMessages([]);
     };
@@ -409,6 +466,8 @@ export default function ChatScreen() {
   }, [messages, typing]);
 
   async function goToRating() {
+    const ratingOtherUserId = sessionOtherUserId ?? otherUserId ?? '';
+
     if (sessionId) {
       await supabase
         .from('sessions')
@@ -424,7 +483,7 @@ export default function ChatScreen() {
     setMessages([]);
     router.replace({
       pathname: '/rating',
-      params: { topic: tp.key, session_id: sessionId ?? '', other_user_id: otherUserId ?? '' },
+      params: { topic: tp.key, session_id: sessionId ?? '', other_user_id: ratingOtherUserId, my_role: myRole ?? '' },
     } as never);
   }
 
@@ -441,7 +500,9 @@ export default function ChatScreen() {
 
   async function send() {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
     if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
     void channelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { isTyping: false } });
     setSendError('');
@@ -456,19 +517,27 @@ export default function ChatScreen() {
         setSendError('You are not connected to the conversation. Try again in a moment.');
         return;
       }
+      const messageId = createMessageId();
       const sentAt = formatClock();
-      const sendResult = await channelRef.current.send({ type: 'broadcast', event: 'message', payload: { text, ts: sentAt } });
+      const sendResult = await channelRef.current.send({
+        type: 'broadcast',
+        event: 'message',
+        payload: { id: messageId, text, ts: sentAt },
+      });
       if (sendResult !== 'ok') {
         console.error('Realtime message send failed', sendResult);
         setSendError('Message could not be sent. Check your connection and try again.');
         return;
       }
       setDraft('');
-      setMessages(prev => [...prev, { id: Date.now(), from: 'me', text, time: sentAt }]);
+      setMessages(prev => [...prev, { id: messageId, from: 'me', text, time: sentAt }]);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (error: unknown) {
       console.error('Message send failed', error);
       setSendError('Safety check is busy. Please try again in a moment.');
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
     }
   }
 
@@ -478,6 +547,35 @@ export default function ChatScreen() {
   }
 
   const isWarning = timeLeft <= SESSION_WARNING_SECONDS && timeLeft > 0;
+
+  if (joinError) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 }}>
+        <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 30, color: t.ink, textAlign: 'center', marginBottom: 10 }}>
+          Conversation unavailable.
+        </Text>
+        <Text style={{ fontSize: 13.5, color: t.ink3, textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
+          {joinError}
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.replace('/(tabs)' as never)}
+          style={{ paddingVertical: 14, paddingHorizontal: 28, borderRadius: 99, backgroundColor: hue }}
+        >
+          <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.bg }}>Go home</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  if (!sessionOtherUserId) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 }}>
+        <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 30, color: t.ink, textAlign: 'center' }}>
+          Opening the room...
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
@@ -617,7 +715,9 @@ export default function ChatScreen() {
             <TextInput
               value={draft}
               onChangeText={handleDraftChange}
-              onSubmitEditing={() => void send()}
+              onSubmitEditing={() => {
+                if (!sending) void send();
+              }}
               placeholder="Say anything…"
               placeholderTextColor={t.ink4}
               returnKeyType="send"
@@ -626,10 +726,10 @@ export default function ChatScreen() {
             />
             <TouchableOpacity
               onPress={() => void send()}
-              disabled={!draft.trim()}
+              disabled={!draft.trim() || sending}
               style={{
                 width: 34, height: 34, borderRadius: 17,
-                backgroundColor: draft.trim() ? hue : t.bg4,
+                backgroundColor: draft.trim() && !sending ? hue : t.bg4,
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
@@ -656,7 +756,7 @@ export default function ChatScreen() {
           onConfirm={() => void goToRating()}
           sessionId={sessionId ?? ''}
           reporterId={userId}
-          reportedUserId={otherUserId ?? ''}
+          reportedUserId={sessionOtherUserId}
         />
       )}
       {exitOpen && (

@@ -18,8 +18,13 @@ export async function moderateMessage(text: string): Promise<{
     throw new Error('Moderation is temporarily busy.');
   }
 
+  if (typeof data?.isSafe !== 'boolean' || typeof data?.isCrisis !== 'boolean') {
+    console.error('Moderation function returned an invalid response');
+    throw new Error('Moderation is temporarily busy.');
+  }
+
   return {
-    isSafe: data?.isSafe === true,
-    isCrisis: data?.isCrisis === true,
+    isSafe: data.isSafe,
+    isCrisis: data.isCrisis,
   };
 }

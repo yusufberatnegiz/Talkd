@@ -1,7 +1,10 @@
 # Tech Stack & Setup - Talkd
 
 ## Expo Version Lock
+
 **Expo 54.0.33 is locked. Do not run `expo upgrade`. Do not change the Expo version.**
+
+Talkd is iOS-first for MVP.
 
 ---
 
@@ -15,8 +18,9 @@
 | Styling | React Native inline styles + shared theme tokens |
 | Theme | `useTheme()` and `useAppearance()` |
 | Backend/Auth/Realtime | Supabase v2 |
+| Database | Supabase Postgres |
 | Auth | Apple + Email implemented; Phone OTP TODO |
-| Moderation | OpenAI Moderation API |
+| Moderation | OpenAI Moderation API through Supabase Edge Function |
 | Push | Expo Notifications |
 | Error tracking | Sentry planned |
 
@@ -24,7 +28,23 @@ NativeWind/Tailwind is intentionally not part of this project.
 
 ---
 
-## Project Initialization
+## Locked Decisions
+
+- Expo must remain **54.0.33**.
+- Do not run `expo upgrade`.
+- Do not change the Expo version in `package.json`.
+- Do not add NativeWind or Tailwind.
+- Do not use `className` styling.
+- Do not add Socket.io.
+- Do not replace Supabase.
+- Do not install new dependencies without explaining why first.
+- Do not expose server-side secrets in the Expo client.
+
+---
+
+## Project Initialization Reference
+
+This section is reference only. Do not use it to upgrade the project.
 
 ```bash
 # Create project with exact Expo version
@@ -36,7 +56,7 @@ npm install expo@54.0.33
 npm install @supabase/supabase-js
 npx supabase init
 
-# Auth (Apple Sign In)
+# Auth - Apple Sign In
 npx expo install expo-apple-authentication
 
 # Push Notifications
@@ -44,9 +64,6 @@ npx expo install expo-notifications expo-device
 
 # Storage
 npx expo install @react-native-async-storage/async-storage
-
-# Moderation
-npm install openai
 
 # Error tracking
 npm install @sentry/react-native
@@ -60,7 +77,7 @@ Do not install `nativewind` or `tailwindcss` unless the project owner explicitly
 
 ---
 
-## Supabase Setup
+## Supabase Client Setup
 
 ```typescript
 // lib/supabase.ts
@@ -81,11 +98,30 @@ export const supabase = createClient(
 );
 ```
 
+Allowed public Expo variables:
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+EXPO_PUBLIC_SENTRY_DSN=https://...
+```
+
+Never expose:
+
+```bash
+EXPO_PUBLIC_OPENAI_API_KEY
+EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+SERVICE_ROLE_KEY
+OPENAI_API_KEY
+```
+
+`OPENAI_API_KEY` and service-role keys must only exist as Supabase Edge Function secrets or server-side environment variables.
+
 ---
 
 ## Styling Pattern
 
-Use React Native style objects and shared theme tokens from `lib/theme.ts`.
+Use React Native style objects and shared theme tokens.
 
 ```typescript
 import { useTheme } from '@/hooks/useTheme';
@@ -104,7 +140,7 @@ export function Example() {
 }
 ```
 
-Do not use `className` styling. Do not add Tailwind config.
+Do not use `className`. Do not add Tailwind config.
 
 ---
 
@@ -118,9 +154,14 @@ async function signInWithApple() {
   const credential = await AppleAuthentication.signInAsync({
     requestedScopes: [AppleAuthentication.AppleAuthenticationScope.EMAIL],
   });
+
+  if (!credential.identityToken) {
+    throw new Error('Apple identity token was not returned.');
+  }
+
   return supabase.auth.signInWithIdToken({
     provider: 'apple',
-    token: credential.identityToken!,
+    token: credential.identityToken,
   });
 }
 
@@ -143,6 +184,8 @@ async function verifyOtp(phone: string, token: string) {
 }
 ```
 
+Email signup must handle the case where email verification is required and no session is returned.
+
 ---
 
 ## Current Topics
@@ -160,57 +203,103 @@ Source of truth: `constants/topics.ts`.
 
 ---
 
-## Supabase Realtime (Chat + Matching)
+## Realtime Usage
 
-```typescript
-// Match queue channel
-const queueChannel = supabase.channel(`match-queue:${topic}:${role}`, {
-  config: { broadcast: { self: false } }
-});
+Supabase Realtime can be used for:
 
-// Chat session channel
-const chatChannel = supabase.channel(`session:${sessionId}`, {
-  config: { broadcast: { self: false } }
-});
+- ephemeral chat messages
+- typing indicators
+- presence
+- non-sensitive session signals
 
-// Send chat message only after moderation passes
-await chatChannel.send({
-  type: 'broadcast',
-  event: 'message',
-  payload: { text, tempId, timestamp, senderId }
-});
+Supabase Realtime must not be the only source of truth for:
 
-// Always unsubscribe/remove on session end
-await supabase.removeChannel(chatChannel);
+- final production matchmaking decisions
+- reports
+- ratings
+- bans
+- account deletion
+- abuse enforcement
+
+Preferred architecture:
+
+```text
+Matchmaking decision: database RPC or Edge Function
+Live message relay: Supabase Realtime
+Safety records: database with RLS
+Moderation: Supabase Edge Function
 ```
 
 ---
 
-## OpenAI Moderation
+## Chat Realtime Pattern
 
 ```typescript
-// lib/moderation.ts
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true,
+const chatChannel = supabase.channel(`session:${sessionId}`, {
+  config: { broadcast: { self: false } },
 });
 
+// Send chat message only after moderation passes.
+await chatChannel.send({
+  type: 'broadcast',
+  event: 'message',
+  payload: { text, tempId, timestamp, senderId },
+});
+
+// Always unsubscribe/remove on session end.
+await supabase.removeChannel(chatChannel);
+```
+
+Messages must not be inserted into the database.
+
+---
+
+## Moderation
+
+Moderation must run before every outbound chat message.
+
+The mobile app must not create an OpenAI client.  
+The mobile app must not contain an OpenAI API key.
+
+Correct client pattern:
+
+```typescript
 export async function moderateMessage(text: string): Promise<{
   isSafe: boolean;
   isCrisis: boolean;
 }> {
-  const result = await openai.moderations.create({ input: text });
-  const output = result.results[0];
-  const isCrisis = Boolean(
-    output.categories['self-harm'] ||
-    output.categories['self-harm/intent'] ||
-    output.categories['self-harm/instructions']
-  );
-  return { isSafe: !output.flagged, isCrisis };
+  const { data, error } = await supabase.functions.invoke('moderate-message', {
+    body: { text },
+  });
+
+  if (error) {
+    throw new Error('Moderation failed. Please try again.');
+  }
+
+  return {
+    isSafe: Boolean(data?.isSafe),
+    isCrisis: Boolean(data?.isCrisis),
+  };
 }
 ```
+
+The Supabase Edge Function uses the private `OPENAI_API_KEY` secret.
+
+Never create an OpenAI client in the mobile app. Never use public Expo variables for OpenAI keys. Never enable browser-style OpenAI client usage in Expo.
+
+---
+
+## Supabase Edge Function Secrets
+
+Set the private `OPENAI_API_KEY` as a Supabase Edge Function secret through the Supabase dashboard or CLI. Do not put the value in source files, Expo public variables, or committed docs.
+
+Deploy function:
+
+```bash
+npx.cmd supabase functions deploy moderate-message
+```
+
+Do not commit `.env` files containing secrets.
 
 ---
 
@@ -248,14 +337,3 @@ export const REENGAGEMENT_INACTIVE_HOURS = 48;
 ```
 
 Do not change `MATCH_TIMEOUT_MS` unless explicitly instructed.
-
----
-
-## Environment Variables
-
-```bash
-EXPO_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-EXPO_PUBLIC_OPENAI_API_KEY=sk-...
-EXPO_PUBLIC_SENTRY_DSN=https://...
-```

@@ -42,6 +42,13 @@ export function Panel({ title }: { title: string }) {
 }
 ```
 
+Rules:
+
+- Do not use `className`.
+- Do not add NativeWind.
+- Do not add Tailwind config.
+- Prefer shared theme tokens over raw colors.
+
 ---
 
 ## Component Pattern
@@ -90,7 +97,9 @@ export function MessageBubble({ text, isMine, timestamp, hue }: MessageBubblePro
 
 ---
 
-## Chat Header (Report + Exit Always Visible)
+## Chat Header Pattern
+
+Report + Exit must always be visible in chat.
 
 ```typescript
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -164,7 +173,9 @@ export function ChatHeader({ secondsLeft, onReport, onExit }: ChatHeaderProps) {
 
 ---
 
-## Crisis Popup (5-Second Lock)
+## Crisis Popup Pattern
+
+Crisis popup must keep the 5-second lock.
 
 ```typescript
 import { useEffect, useState } from 'react';
@@ -182,8 +193,10 @@ export function CrisisPopup({ visible, onContinue }: CrisisPopupProps) {
 
   useEffect(() => {
     if (!visible) return;
+
     setCanDismiss(false);
     const timer = setTimeout(() => setCanDismiss(true), 5000);
+
     return () => clearTimeout(timer);
   }, [visible]);
 
@@ -223,35 +236,87 @@ export function CrisisPopup({ visible, onContinue }: CrisisPopupProps) {
 
 ## Message Send Flow
 
+Messages must be moderated before broadcast. Messages must not be inserted into the database.
+
+Do not clear the draft until moderation and realtime broadcast both succeed.
+
 ```typescript
 async function handleSend(text: string) {
-  if (!text.trim() || !chatChannel || !sessionId) return;
+  const trimmed = text.trim();
 
-  const { isSafe, isCrisis } = await moderateMessage(text);
-
-  if (isCrisis) {
-    setCrisisVisible(true);
+  if (!trimmed || !chatChannel || !sessionId || !userId) {
     return;
   }
 
-  if (!isSafe) return;
+  setSending(true);
+  setSendError(null);
 
-  const timestamp = new Date().toISOString();
-  addMessage({ text, isMine: true, timestamp });
+  try {
+    const { isSafe, isCrisis } = await moderateMessage(trimmed);
 
-  await chatChannel.send({
-    type: 'broadcast',
-    event: 'message',
-    payload: { text, timestamp, senderId: userId },
-  });
+    if (isCrisis) {
+      setCrisisVisible(true);
+      return;
+    }
+
+    if (!isSafe) {
+      setSendError('That message could not be sent.');
+      return;
+    }
+
+    const tempId = createTempId();
+    const timestamp = new Date().toISOString();
+
+    const result = await chatChannel.send({
+      type: 'broadcast',
+      event: 'message',
+      payload: {
+        text: trimmed,
+        tempId,
+        timestamp,
+        senderId: userId,
+      },
+    });
+
+    if (result !== 'ok') {
+      setSendError('Message could not be sent. Please try again.');
+      return;
+    }
+
+    addMessage({
+      id: tempId,
+      text: trimmed,
+      isMine: true,
+      timestamp,
+    });
+
+    setDraft('');
+  } catch (error: unknown) {
+    console.error(error);
+    setSendError('Message could not be sent. Please try again.');
+  } finally {
+    setSending(false);
+  }
 }
 ```
 
-Chat text must be moderated before broadcast. Messages are not inserted into the database.
+Recommended temp ID helper:
+
+```typescript
+export function createTempId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+```
 
 ---
 
-## Session End
+## Session End Pattern
+
+Always remove/unsubscribe from the realtime channel and wipe local messages on session end.
 
 ```typescript
 async function handleSessionEnd() {
@@ -264,7 +329,86 @@ async function handleSessionEnd() {
 }
 ```
 
-Always remove/unsubscribe the realtime channel and wipe local messages on session end.
+Rules:
+
+- Do not leave the user in the session channel after exit.
+- Do not keep messages in local state after session end.
+- Do not store messages in Supabase tables.
+
+---
+
+## Report Pattern
+
+Reports must be submitted only by authenticated users and only for sessions the user participated in.
+
+```typescript
+async function submitReport(reason: ReportReason) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !sessionId || !reportedUserId) {
+    return;
+  }
+
+  const { error } = await supabase.from('reports').insert({
+    session_id: sessionId,
+    reporter_id: user.id,
+    reported_user_id: reportedUserId,
+    reason,
+  });
+
+  if (error) {
+    console.error(error);
+    setReportError('Report could not be submitted.');
+    return;
+  }
+
+  setReportSubmitted(true);
+}
+```
+
+Database RLS/functions must enforce that reporter and reported user are valid participants.
+
+---
+
+## Rating Pattern
+
+Ratings are anonymous to users. Never expose who rated whom.
+
+```typescript
+async function submitRating(input: {
+  sessionId: string;
+  ratedUserId: string;
+  stars: number | null;
+  badge: string | null;
+  privateNote: string | null;
+}) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return;
+  }
+
+  const { error } = await supabase.from('session_ratings').insert({
+    session_id: input.sessionId,
+    rater_id: user.id,
+    rated_user_id: input.ratedUserId,
+    stars: input.stars,
+    badge: input.badge,
+    private_note: input.privateNote,
+  });
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+}
+```
+
+Private notes must not appear in public views.
 
 ---
 
@@ -273,8 +417,38 @@ Always remove/unsubscribe the realtime channel and wipe local messages on sessio
 ```typescript
 try {
   await doSomething();
-} catch (error) {
+} catch (error: unknown) {
   // Capture with Sentry once configured.
   console.error(error);
 }
+```
+
+Rules:
+
+- Use `unknown`, not `any`.
+- Show user-friendly errors.
+- Do not expose raw API/secrets/errors to the user.
+- Capture with Sentry once configured.
+
+---
+
+## Copy Pattern
+
+Do not write:
+
+```text
+End-to-end encrypted
+No records
+Nothing is stored
+Permanently deletes account
+```
+
+unless those statements are technically true.
+
+Preferred wording:
+
+```text
+Real-time anonymous chat
+Messages are not saved after the session
+Session metadata, reports, and ratings may be stored for safety and quality
 ```

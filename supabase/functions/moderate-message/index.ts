@@ -11,6 +11,14 @@ interface ModerationResponse {
   results?: ModerationResult[];
 }
 
+const BLOCKED_PATTERNS = [
+  /\bsex\b/i,
+  /\bfuck(?:ing|ed|er|s)?\b/i,
+  /\bsikiş\w*/i,
+  /\bsikis\w*/i,
+  /\bsik(?:eyim|erim|tir|tiğ\w*|tig\w*)?\b/i,
+];
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -33,6 +41,10 @@ Deno.serve(async (request: Request) => {
 
     if (!text) {
       return json({ isSafe: true, isCrisis: false }, 200);
+    }
+
+    if (isBlockedByTalkdRules(text)) {
+      return json({ isSafe: false, isCrisis: false }, 200);
     }
 
     const response = await moderateWithOpenAI(openAiApiKey, text);
@@ -63,6 +75,10 @@ Deno.serve(async (request: Request) => {
     return json({ error: 'Moderation failed.' }, 500);
   }
 });
+
+function isBlockedByTalkdRules(text: string): boolean {
+  return BLOCKED_PATTERNS.some(pattern => pattern.test(text));
+}
 
 async function moderateWithOpenAI(openAiApiKey: string, text: string): Promise<Response> {
   const maxAttempts = 3;

@@ -7,7 +7,7 @@
 ## 1. System Overview
 
 Talkd is a real-time anonymous peer-to-peer chat app built in React Native (Expo 54.0.33) for iOS.
-Two users match by topic + role, chat for 15 minutes, then the session closes and messages are permanently deleted.
+Two users match by topic + role, chat for 15 minutes, then the session closes. Chat messages are relayed through Supabase Realtime only, are not saved in the database, and are wiped from local state when the session ends.
 
 ### Core Technical Constraints
 - Messages must NOT persist after session ends
@@ -25,14 +25,14 @@ Two users match by topic + role, chat for 15 minutes, then the session closes an
 | Mobile | React Native + Expo | **54.0.33 LOCKED** | Do not upgrade |
 | Routing | Expo Router | v3 (included in 54) | File-based routing |
 | Language | TypeScript | 5.x | Strict mode, zero `any` |
-| Styling | NativeWind | v4 | Tailwind for RN |
-| Theme | System default | - | useColorScheme() hook |
-| State | Zustand | Latest stable | |
+| Styling | React Native inline styles | - | Shared theme tokens |
+| Theme | Custom theme tokens | - | `useTheme()` / `useAppearance()` |
+| State | React state + focused hooks | - | Add shared state only when needed |
 | Real-time | Supabase Realtime | v2 | Channels for chat + matching |
 | Auth | Supabase Auth | v2 | Email + Phone + Apple |
 | Database | Supabase (PostgreSQL) | v2 | Built-in Postgres |
 | Push | Expo Notifications | 54-compatible | iOS APNs |
-| Moderation | OpenAI Moderation API | Latest | Free, per-message |
+| Moderation | OpenAI Moderation API via Supabase Edge Function | Latest | Server-side key only |
 | Analytics | Supabase Analytics + custom | - | Session + user events |
 | Errors | Sentry | Latest 54-compatible | Crash reporting |
 
@@ -83,7 +83,7 @@ talkd-mobile/
 │       └── ReportConfirm.tsx
 ├── lib/
 │   ├── supabase.ts               # Supabase client singleton
-│   ├── moderation.ts             # OpenAI Moderation API
+│   ├── moderation.ts             # Calls Supabase Edge Function for moderation
 │   ├── notifications.ts          # Expo push notifications
 │   └── storage.ts                # AsyncStorage helpers
 ├── hooks/
@@ -358,8 +358,7 @@ export function useTheme() {
   return scheme === 'dark' ? darkTheme : lightTheme;
 }
 
-// NativeWind handles dark mode automatically via:
-// className="bg-white dark:bg-gray-950 text-gray-900 dark:text-white"
+// Styles use React Native style objects and shared theme tokens.
 ```
 
 ---
@@ -416,8 +415,10 @@ export const REENGAGEMENT_INACTIVE_HOURS = 48; // Push after 48h inactivity
 # .env (mobile)
 EXPO_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-EXPO_PUBLIC_OPENAI_API_KEY=sk-...
 EXPO_PUBLIC_SENTRY_DSN=https://...
+
+# Do not put OPENAI_API_KEY or service-role keys in the mobile app.
+# The OpenAI key belongs only in Supabase Edge Function secrets.
 ```
 
 ---
@@ -431,9 +432,9 @@ EXPO_PUBLIC_SENTRY_DSN=https://...
 5. **Expo version is 54.0.33.** Do not run `expo upgrade`. Do not change `expo` in package.json.
 6. **Report + Exit always visible** in `ChatHeader.tsx`. Never in a menu.
 7. **Crisis popup: 5-second lock.** `setTimeout(5000)` before enabling dismiss. Hard requirement.
-8. **`clearSession()` on every session end.** Messages wiped from Zustand state immediately.
+8. **Clear local messages on every session end.** Messages are wiped from React state immediately.
 9. **TypeScript strict mode.** `any` forbidden. Use `unknown` with type guards.
-10. **Rating is anonymous.** No `user_id` in `session_ratings` table.
+10. **Rating is anonymous to users.** Store rater/rated IDs only for RLS, duplicate prevention, and safety enforcement; never expose who rated whom in the app.
 11. **Re-engagement push after 48h inactivity.** Use `REENGAGEMENT_INACTIVE_HOURS` constant.
 12. **Async messages expire in 24h.** Set `expires_at = NOW() + INTERVAL '24 hours'` on insert.
 

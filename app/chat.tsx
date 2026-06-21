@@ -30,6 +30,15 @@ interface SessionAccessRow {
   status: string | null;
 }
 
+interface PresenceMeta {
+  user_id?: string;
+  online_at?: string;
+}
+
+const PEER_DISCONNECT_GRACE_MS = 5000;
+const HEARTBEAT_INTERVAL_MS = 2000;
+const HEARTBEAT_TIMEOUT_MS = 6500;
+
 function Sheet({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   const t = useTheme();
   return (
@@ -303,6 +312,11 @@ export default function ChatScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const peerDisconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastPeerHeartbeatRef = useRef<number | null>(null);
+  const disconnectSessionMarkedRef = useRef(false);
 
   const {
     topic: topicParam, specific, specific_from,
@@ -331,6 +345,7 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [sessionOtherUserId, setSessionOtherUserId] = useState<string | null>(null);
+  const [peerDisconnected, setPeerDisconnected] = useState(false);
   const sendingRef = useRef(false);
 
   function formatClock() {
@@ -352,6 +367,36 @@ export default function ChatScreen() {
     return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
+  function clearPeerDisconnectTimeout() {
+    if (peerDisconnectTimeoutRef.current) {
+      clearTimeout(peerDisconnectTimeoutRef.current);
+      peerDisconnectTimeoutRef.current = null;
+    }
+  }
+
+  function clearHeartbeatIntervals() {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+    if (heartbeatCheckIntervalRef.current) {
+      clearInterval(heartbeatCheckIntervalRef.current);
+      heartbeatCheckIntervalRef.current = null;
+    }
+  }
+
+  function markPeerSeen() {
+    lastPeerHeartbeatRef.current = Date.now();
+    clearPeerDisconnectTimeout();
+    setPeerDisconnected(false);
+  }
+
+  function peerIsPresent(state: Record<string, PresenceMeta[]>, peerUserId: string): boolean {
+    return Object.values(state).some(metas => (
+      metas.some(meta => meta.user_id === peerUserId)
+    ));
+  }
+
   // Load user ID
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -364,6 +409,7 @@ export default function ChatScreen() {
     if (!sessionId || !userId) return;
 
     let isCancelled = false;
+    const currentUserId = userId;
 
     async function setupChannel() {
       setJoinError('');
@@ -394,23 +440,54 @@ export default function ChatScreen() {
       }
 
       setSessionOtherUserId(verifiedOtherUserId);
+      setPeerDisconnected(false);
+      lastPeerHeartbeatRef.current = null;
+      disconnectSessionMarkedRef.current = false;
 
       const channel = supabase.channel(`session:${sessionId}`, {
-        config: { broadcast: { self: false } },
+        config: {
+          broadcast: { self: false },
+          presence: { key: currentUserId },
+        },
       });
 
       channel
+        .on('presence', { event: 'sync' }, () => {
+          const presenceState = channel.presenceState() as unknown as Record<string, PresenceMeta[]>;
+          if (peerIsPresent(presenceState, verifiedOtherUserId)) {
+            markPeerSeen();
+            return;
+          }
+
+          setTyping(false);
+          if (!peerDisconnectTimeoutRef.current) {
+            peerDisconnectTimeoutRef.current = setTimeout(() => {
+              setPeerDisconnected(true);
+              peerDisconnectTimeoutRef.current = null;
+            }, PEER_DISCONNECT_GRACE_MS);
+          }
+        })
+        .on('broadcast', { event: 'heartbeat' }, ({ payload }: { payload: { user_id?: string } }) => {
+          if (payload.user_id === verifiedOtherUserId) {
+            markPeerSeen();
+          }
+        })
         .on('broadcast', { event: 'message' }, ({ payload }: { payload: { id?: string; text: string; ts: string } }) => {
+          markPeerSeen();
           setMessages(prev => [...prev, { id: payload.id ?? createMessageId(), from: 'them', text: payload.text, time: payload.ts }]);
           setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
         })
         .on('broadcast', { event: 'continue_agree' }, () => {
+          markPeerSeen();
           setTheyAgreed(true);
         })
         .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { isTyping: boolean } }) => {
+          markPeerSeen();
           setTyping(payload.isTyping);
         })
         .on('broadcast', { event: 'session_end' }, () => {
+          clearPeerDisconnectTimeout();
+          clearHeartbeatIntervals();
           if (channelRef.current) {
             void supabase.removeChannel(channelRef.current);
             channelRef.current = null;
@@ -423,7 +500,30 @@ export default function ChatScreen() {
             } as never);
           }, 700);
         })
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            void channel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
+            void channel.send({ type: 'broadcast', event: 'heartbeat', payload: { user_id: currentUserId } });
+            heartbeatIntervalRef.current = setInterval(() => {
+              void channel.send({ type: 'broadcast', event: 'heartbeat', payload: { user_id: currentUserId } });
+            }, HEARTBEAT_INTERVAL_MS);
+            heartbeatCheckIntervalRef.current = setInterval(() => {
+              const lastPeerHeartbeat = lastPeerHeartbeatRef.current;
+              if (lastPeerHeartbeat !== null && Date.now() - lastPeerHeartbeat > HEARTBEAT_TIMEOUT_MS) {
+                setTyping(false);
+                setPeerDisconnected(true);
+                if (!disconnectSessionMarkedRef.current) {
+                  disconnectSessionMarkedRef.current = true;
+                  void supabase
+                    .from('sessions')
+                    .update({ status: 'ended', ended_at: new Date().toISOString() })
+                    .eq('id', sessionId)
+                    .eq('status', 'active');
+                }
+              }
+            }, 1000);
+          }
+        });
 
       channelRef.current = channel;
     }
@@ -433,6 +533,9 @@ export default function ChatScreen() {
     return () => {
       isCancelled = true;
       if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
+      clearPeerDisconnectTimeout();
+      clearHeartbeatIntervals();
+      lastPeerHeartbeatRef.current = null;
       if (channelRef.current) {
         void supabase.removeChannel(channelRef.current);
       }
@@ -476,6 +579,8 @@ export default function ChatScreen() {
     }
 
     if (channelRef.current) {
+      clearPeerDisconnectTimeout();
+      clearHeartbeatIntervals();
       await channelRef.current.send({ type: 'broadcast', event: 'session_end', payload: {} });
       await supabase.removeChannel(channelRef.current);
       channelRef.current = null;
@@ -501,6 +606,10 @@ export default function ChatScreen() {
   async function send() {
     const text = draft.trim();
     if (!text || sendingRef.current) return;
+    if (peerDisconnected) {
+      setSendError('They disconnected. You can wait a moment, report, or exit safely.');
+      return;
+    }
     sendingRef.current = true;
     setSending(true);
     if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
@@ -547,6 +656,7 @@ export default function ChatScreen() {
   }
 
   const isWarning = timeLeft <= SESSION_WARNING_SECONDS && timeLeft > 0;
+  const sessionStatusLabel = peerDisconnected ? 'Disconnected' : untimed ? 'No timer' : formatTime(timeLeft);
 
   if (joinError) {
     return (
@@ -600,7 +710,7 @@ export default function ChatScreen() {
                 Someone listening
               </Text>
               <Text style={{ fontSize: 10.5, color: t.ink3, marginTop: 1, letterSpacing: 0.3 }}>
-                {tp.label} · {untimed ? 'No timer' : formatTime(timeLeft)}
+                {tp.label} · {sessionStatusLabel}
               </Text>
             </View>
           </View>
@@ -666,6 +776,16 @@ export default function ChatScreen() {
           </View>
         )}
 
+        {peerDisconnected && (
+          <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+            <View style={{ padding: 12, backgroundColor: t.bg2, borderRadius: 14, borderWidth: 0.5, borderColor: t.amber + '55' }}>
+              <Text style={{ fontSize: 12.5, color: t.ink2, lineHeight: 18, textAlign: 'center' }}>
+                They disconnected. You can wait a moment, report, or exit safely.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Messages */}
         <ScrollView
           ref={scrollRef}
@@ -716,9 +836,10 @@ export default function ChatScreen() {
               value={draft}
               onChangeText={handleDraftChange}
               onSubmitEditing={() => {
-                if (!sending) void send();
+                if (!sending && !peerDisconnected) void send();
               }}
-              placeholder="Say anything…"
+              editable={!peerDisconnected}
+              placeholder={peerDisconnected ? 'Waiting for them...' : 'Say anything…'}
               placeholderTextColor={t.ink4}
               returnKeyType="send"
               multiline
@@ -726,14 +847,14 @@ export default function ChatScreen() {
             />
             <TouchableOpacity
               onPress={() => void send()}
-              disabled={!draft.trim() || sending}
+              disabled={!draft.trim() || sending || peerDisconnected}
               style={{
                 width: 34, height: 34, borderRadius: 17,
-                backgroundColor: draft.trim() && !sending ? hue : t.bg4,
+                backgroundColor: draft.trim() && !sending && !peerDisconnected ? hue : t.bg4,
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 16, color: draft.trim() ? t.bg : t.ink4 }}>↑</Text>
+              <Text style={{ fontSize: 16, color: draft.trim() && !peerDisconnected ? t.bg : t.ink4 }}>↑</Text>
             </TouchableOpacity>
           </View>
           {!!sendError && (

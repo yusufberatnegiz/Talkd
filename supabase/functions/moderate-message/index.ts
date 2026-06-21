@@ -11,12 +11,19 @@ interface ModerationResponse {
   results?: ModerationResult[];
 }
 
+const CRISIS_PATTERNS = [
+  /\b(kill myself|hurt myself|end my life|take my life|want to die|i should die|suicide|suicidal)\b/,
+  /\b(kendimi oldur|kendimi oldurmek|intihar|yasamak istemiyorum|olmek istiyorum)\b/,
+];
+
 const BLOCKED_PATTERNS = [
-  /\bsex\b/i,
-  /\bfuck(?:ing|ed|er|s)?\b/i,
-  /\bsikiş\w*/i,
-  /\bsikis\w*/i,
-  /\bsik(?:eyim|erim|tir|tiğ\w*|tig\w*)?\b/i,
+  /\b(sex|sexting|nude|nudes|porn|porno|horny|blowjob|handjob|cum|dick|penis|pussy|vagina|boobs|anal)\b/,
+  /\b(fuck|fucking|fucked|fucker|shit|bitch|asshole|cunt|motherfucker)\b/,
+  /\b(amk|a mk|aq|amq|mk|oc|o c|amina\w*|amini\w*|amcik\w*|sikis\w*|sik\w*|yarrak\w*|yarak\w*|orospu\w*|gotveren\w*|pic\w*)\b/,
+  /\b(child porn|underage sex|minor nudes|rape|raping|rapist)\b/,
+  /\b(kys|kill yourself|go kill yourself|go die|die already|you should die|end yourself)\b/,
+  /\b(kill you|hurt you|beat you up|i will find you)\b/,
+  /\b(geber|gebersin|kendini oldur|kendini gebert|ol kendini oldur|olmelisin|olmen lazim|git ol|ol artik|canina kiy)\b/,
 ];
 
 const corsHeaders = {
@@ -40,11 +47,17 @@ Deno.serve(async (request: Request) => {
     const text = typeof body.text === 'string' ? body.text.trim() : '';
 
     if (!text) {
-      return json({ isSafe: true, isCrisis: false }, 200);
+      return json({ isSafe: true, isCrisis: false, reason: null }, 200);
     }
 
-    if (isBlockedByTalkdRules(text)) {
-      return json({ isSafe: false, isCrisis: false }, 200);
+    const normalizedText = normalizeForRules(text);
+
+    if (isCrisisByTalkdRules(normalizedText)) {
+      return json({ isSafe: false, isCrisis: true, reason: 'crisis_rule' }, 200);
+    }
+
+    if (isBlockedByTalkdRules(normalizedText)) {
+      return json({ isSafe: false, isCrisis: false, reason: 'talkd_rule' }, 200);
     }
 
     const response = await moderateWithOpenAI(openAiApiKey, text);
@@ -66,18 +79,43 @@ Deno.serve(async (request: Request) => {
     const isCrisis = categories['self-harm'] === true ||
       categories['self-harm/intent'] === true ||
       categories['self-harm/instructions'] === true;
+    const isFlagged = result?.flagged === true;
 
     return json({
-      isSafe: result?.flagged !== true,
+      isSafe: !isFlagged && !isCrisis,
       isCrisis,
+      reason: isFlagged ? 'openai_flagged' : null,
     }, 200);
   } catch {
     return json({ error: 'Moderation failed.' }, 500);
   }
 });
 
-function isBlockedByTalkdRules(text: string): boolean {
-  return BLOCKED_PATTERNS.some(pattern => pattern.test(text));
+function normalizeForRules(text: string): string {
+  return text
+    .toLocaleLowerCase('en-US')
+    .replaceAll('\u0131', 'i')
+    .replaceAll('\u015f', 's')
+    .replaceAll('\u011f', 'g')
+    .replaceAll('\u00fc', 'u')
+    .replaceAll('\u00f6', 'o')
+    .replaceAll('\u00e7', 'c')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[@$!|]/g, match => {
+      if (match === '@') return 'a';
+      if (match === '$') return 's';
+      if (match === '!') return 'i';
+      return 'l';
+    });
+}
+
+function isCrisisByTalkdRules(normalizedText: string): boolean {
+  return CRISIS_PATTERNS.some(pattern => pattern.test(normalizedText));
+}
+
+function isBlockedByTalkdRules(normalizedText: string): boolean {
+  return BLOCKED_PATTERNS.some(pattern => pattern.test(normalizedText));
 }
 
 async function moderateWithOpenAI(openAiApiKey: string, text: string): Promise<Response> {

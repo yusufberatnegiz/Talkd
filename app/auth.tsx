@@ -68,6 +68,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [checkEmail, setCheckEmail] = useState(false);
 
   const clearError = () => { if (error) setError(''); };
 
@@ -106,7 +107,7 @@ export default function AuthScreen() {
         : await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (authError) { setError(getAuthErrorMessage(authError.message, mode)); return; }
       if (mode === 'signup' && !data.session) {
-        setError('Account created. Check your email to confirm it before signing in.');
+        setCheckEmail(true);
         return;
       }
       router.replace('/(tabs)');
@@ -115,6 +116,35 @@ export default function AuthScreen() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checkEmail) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
+        <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: 'center' }}>
+          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 38, letterSpacing: -0.8, color: t.ink, marginBottom: 10 }}>
+            Check your email.
+          </Text>
+          <Text style={{ fontSize: 14, color: t.ink3, marginBottom: 28, lineHeight: 21 }}>
+            Confirm your account, then come back and sign in. You will still appear as Anonymous in Talkd.
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setCheckEmail(false);
+              setMode('signin');
+              setPassword('');
+              setError('');
+            }}
+            style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: t.amber }}
+            activeOpacity={0.85}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '600', color: t.bg, letterSpacing: -0.1 }}>
+              Back to sign in
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   const inputStyle = {

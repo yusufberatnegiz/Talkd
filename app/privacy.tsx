@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function PrivacyScreen() {
   const t = useTheme();
   const router = useRouter();
-  const [exportMessage, setExportMessage] = useState(false);
+  const [noticeMessage, setNoticeMessage] = useState('');
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -16,8 +16,13 @@ export default function PrivacyScreen() {
   }
 
   function handleExport() {
-    setExportMessage(true);
-    setTimeout(() => setExportMessage(false), 2000);
+    setNoticeMessage('Data export is coming soon.');
+    setTimeout(() => setNoticeMessage(''), 2500);
+  }
+
+  function handleDeletionRequest() {
+    setNoticeMessage('Contact support@talkd.app to request account deletion.');
+    setTimeout(() => setNoticeMessage(''), 3500);
   }
 
   return (
@@ -56,12 +61,27 @@ export default function PrivacyScreen() {
               Coming soon for session activity, ratings, and safety records.
             </Text>
           </TouchableOpacity>
-          {exportMessage && (
-            <View style={{ paddingHorizontal: 20, paddingBottom: 14 }}>
-              <Text style={{ fontSize: 12, color: t.amber, letterSpacing: 0.2 }}>Coming soon.</Text>
-            </View>
-          )}
         </View>
+
+        {/* Account deletion */}
+        <View style={{ borderRadius: 16, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, overflow: 'hidden' }}>
+          <TouchableOpacity
+            onPress={handleDeletionRequest}
+            style={{ paddingHorizontal: 20, paddingVertical: 18 }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '500', color: t.ink }}>Account deletion</Text>
+            <Text style={{ fontSize: 12.5, color: t.ink3, marginTop: 3, lineHeight: 18 }}>
+              Self-serve deletion is coming soon. For now, contact support to request account deletion.
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {!!noticeMessage && (
+          <Text style={{ paddingHorizontal: 4, fontSize: 12, color: t.amber, letterSpacing: 0.2, lineHeight: 18 }}>
+            {noticeMessage}
+          </Text>
+        )}
 
         {/* Sign out */}
         <View style={{ borderRadius: 16, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.red + '40', overflow: 'hidden' }}>

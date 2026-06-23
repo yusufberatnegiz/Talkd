@@ -1,3 +1,4 @@
+import { Sentry, initSentry } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import { hasAcceptedSafetyGuidelines, subscribeSafetyAcceptance } from '@/lib/safetyAcceptance';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -6,7 +7,9 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 
-export default function RootLayout() {
+initSentry();
+
+function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -84,3 +87,5 @@ export default function RootLayout() {
     </>
   );
 }
+
+export default Sentry.wrap(RootLayout);

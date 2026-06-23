@@ -261,7 +261,7 @@ export default function OnboardingScreen() {
           style={{ flex: 1, paddingVertical: 16, backgroundColor: accepting ? t.bg3 : t.amber, borderRadius: 99, alignItems: 'center' }}
           activeOpacity={0.85}
         >
-          <Text style={{ fontSize: 15, fontWeight: '600', color: accepting ? t.ink4 : t.bg, letterSpacing: -0.1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: accepting ? t.ink4 : t.onAccent, letterSpacing: -0.1 }}>
             {accepting ? 'Saving...' : s.cta}
           </Text>
         </TouchableOpacity>

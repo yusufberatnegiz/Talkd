@@ -186,7 +186,7 @@ export default function RatingScreen() {
                 activeOpacity={0.8}
               >
                 <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: b.color }} />
-                <Text style={{ fontFamily: 'Georgia', fontSize: 16, letterSpacing: -0.1, color: active ? b.color : t.ink }}>
+                <Text style={{ fontSize: 14.5, fontWeight: '600', color: active ? b.color : t.ink }}>
                   {b.label}
                 </Text>
               </TouchableOpacity>
@@ -207,7 +207,7 @@ export default function RatingScreen() {
           style={{
             minHeight: 64, padding: 14, borderRadius: 14,
             backgroundColor: t.bg2, borderWidth: 0.5, borderColor: t.line,
-            color: t.ink, fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 14,
+            color: t.ink, fontSize: 14,
             textAlignVertical: 'top', marginBottom: 24,
           }}
         />
@@ -216,10 +216,10 @@ export default function RatingScreen() {
         <TouchableOpacity
           disabled={submitting}
           onPress={() => void handleSubmit()}
-          style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: submitting ? t.bg3 : t.amber }}
+          style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: submitting ? t.bg3 : tp.hue }}
           activeOpacity={0.85}
         >
-          <Text style={{ fontSize: 14.5, fontWeight: '600', color: submitting ? t.ink4 : t.bg, letterSpacing: -0.1 }}>
+          <Text style={{ fontSize: 14.5, fontWeight: '600', color: submitting ? t.ink4 : t.onAccent, letterSpacing: -0.1 }}>
             {submitting ? 'Saving...' : stars || picked || note.trim() ? 'Send & close' : 'Skip & close'}
           </Text>
         </TouchableOpacity>

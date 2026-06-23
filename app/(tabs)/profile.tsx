@@ -4,8 +4,8 @@ import { type AppearanceChoice, APPEARANCE_LABEL, setAppearance, useAppearance, 
 import { useUserStats } from '@/hooks/useUserStats';
 import { useRouter } from 'expo-router';
 import {
-  Bell, ChevronRight, HelpCircle,
-  LogOut, MessageSquare, Moon, Shield,
+  Bell, ChevronRight, Headphones, HelpCircle,
+  LogOut, Moon, Shield,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useState } from 'react';
@@ -91,7 +91,7 @@ export default function ProfileScreen() {
       section: 'Support',
       items: [
         { icon: HelpCircle, label: 'Help center', onPress: () => Linking.openURL('mailto:support@talkd.app') },
-        { icon: MessageSquare, label: 'Become a listener', onPress: () => router.push('/listener' as never) },
+        { icon: Headphones, label: 'Go on duty', onPress: () => router.push('/listener' as never) },
       ],
     },
   ];
@@ -144,7 +144,13 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 8 }}
+        overScrollMode="never"
+        bounces={false}
+      >
 
         {/* Header */}
         <View style={{ paddingHorizontal: 28, paddingTop: 48, paddingBottom: 20 }}>
@@ -156,13 +162,13 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Listen tonight — promoted to top */}
+        {/* Go on duty */}
         <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
           <TouchableOpacity
             onPress={() => router.push('/listener' as never)}
             style={{
               borderRadius: 16, padding: 18,
-              backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.coral + '50',
+              backgroundColor: t.bg, borderWidth: 0.5, borderColor: t.coral + '50',
               flexDirection: 'row', alignItems: 'center', gap: 14,
             }}
             activeOpacity={0.85}
@@ -172,11 +178,11 @@ export default function ProfileScreen() {
               backgroundColor: t.coral + '18', borderWidth: 0.5, borderColor: t.coral + '44',
               alignItems: 'center', justifyContent: 'center',
             }}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.coral }} />
+              <Headphones size={20} color={t.coral} strokeWidth={2.2} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '500', color: t.coral }}>Listen to someone tonight</Text>
-              <Text style={{ fontSize: 12.5, color: t.ink3, marginTop: 2 }}>Help out · 10–15 min each</Text>
+              <Text style={{ fontSize: 15, fontWeight: '500', color: t.coral }}>Go on duty</Text>
+              <Text style={{ fontSize: 12.5, color: t.ink3, marginTop: 2 }}>Be there for someone</Text>
             </View>
             <ChevronRight size={16} color={t.ink4} style={{ opacity: 0.6 }} />
           </TouchableOpacity>
@@ -193,9 +199,9 @@ export default function ProfileScreen() {
               backgroundColor: t.bg4, borderWidth: 0.5, borderColor: t.lineStrong,
               alignItems: 'center', justifyContent: 'center',
             }}>
-              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 24, color: t.ink3 }}>A</Text>
+              <Text style={{ fontSize: 24, fontWeight: '700', color: t.ink3 }}>A</Text>
             </View>
-            <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: t.ink, marginTop: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: t.ink, marginTop: 12 }}>
               Anonymous User
             </Text>
             <View style={{ marginTop: 20, flexDirection: 'row', width: '100%' }}>
@@ -204,7 +210,7 @@ export default function ProfileScreen() {
                   { flex: 1, alignItems: 'center' },
                   i > 0 ? { borderLeftWidth: 0.5, borderLeftColor: t.line } : undefined,
                 ]}>
-                  <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: t.ink, lineHeight: 22 }}>{v}</Text>
+                  <Text style={{ fontSize: 20, fontWeight: '700', color: t.ink, lineHeight: 22 }}>{v}</Text>
                   <Text style={{ marginTop: 4, fontSize: 11, color: t.ink4 }}>{l}</Text>
                 </View>
               ))}

@@ -1,4 +1,4 @@
-export const theme = {
+export const darkTheme = {
   bg: '#0E0D0C',
   bg2: '#171513',
   bg3: '#211E1B',
@@ -16,8 +16,40 @@ export const theme = {
   coral: '#E89A8A',
   coralDim: 'rgba(232,154,138,0.18)',
   coralSoft: 'rgba(232,154,138,0.10)',
+  onAccent: '#0E0D0C',
+  topicBgAlpha: '14',
+  topicBorderAlpha: '30',
+  topicIconBgAlpha: '22',
   red: '#D97757',
   redDim: 'rgba(217,119,87,0.18)',
 };
 
-export type Theme = typeof theme;
+export const lightTheme: typeof darkTheme = {
+  bg: '#FBF5EA',
+  bg2: '#FFFFFF',
+  bg3: '#F3E8D8',
+  bg4: '#E7D8C3',
+  line: 'rgba(49,36,22,0.11)',
+  lineStrong: 'rgba(49,36,22,0.20)',
+  ink: '#241E18',
+  ink2: 'rgba(36,30,24,0.76)',
+  ink3: 'rgba(36,30,24,0.58)',
+  ink4: 'rgba(36,30,24,0.40)',
+  ink5: 'rgba(36,30,24,0.20)',
+  amber: '#B9792E',
+  amberDim: 'rgba(185,121,46,0.18)',
+  amberSoft: 'rgba(185,121,46,0.10)',
+  coral: '#C45E50',
+  coralDim: 'rgba(196,94,80,0.17)',
+  coralSoft: 'rgba(196,94,80,0.10)',
+  onAccent: '#17130F',
+  topicBgAlpha: '28',
+  topicBorderAlpha: '42',
+  topicIconBgAlpha: '2E',
+  red: '#B84632',
+  redDim: 'rgba(184,70,50,0.14)',
+};
+
+export const theme = darkTheme;
+
+export type Theme = typeof darkTheme;

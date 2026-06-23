@@ -1,4 +1,5 @@
 import { BottomNav } from '@/components/BottomNav';
+import { TopicIcon } from '@/components/TopicIcon';
 import { formatFeedbackBadge, useReceivedFeedback } from '@/hooks/useReceivedFeedback';
 import { useTheme } from '@/hooks/useTheme';
 import { useUserStats } from '@/hooks/useUserStats';
@@ -27,7 +28,13 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 8 }}
+        overScrollMode="never"
+        bounces={false}
+      >
 
         {/* Header */}
         <View style={{ paddingHorizontal: 28, paddingTop: 48, paddingBottom: 20 }}>
@@ -55,7 +62,7 @@ export default function HistoryScreen() {
                     i > 0 ? { borderLeftWidth: 0.5, borderLeftColor: t.line } : undefined,
                   ]}
                 >
-                  <Text style={{ fontFamily: 'Georgia', fontSize: 26, fontWeight: '600', color: t.ink, lineHeight: 30 }}>
+                  <Text style={{ fontSize: 25, fontWeight: '700', color: t.ink, lineHeight: 30 }}>
                     {s.v}
                   </Text>
                   <Text style={{ marginTop: 6, fontSize: 11.5, color: t.ink3 }}>{s.l}</Text>
@@ -78,17 +85,18 @@ export default function HistoryScreen() {
             </View>
           ) : byTopic.length > 0 ? (
             <View style={{ gap: 8 }}>
-              {byTopic.map(item => (
+              {byTopic.map(item => {
+                return (
                 <View
                   key={item.topicKey}
-                  style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, padding: 14 }}
+                  style={{ borderRadius: 12, backgroundColor: item.hue + t.topicBgAlpha, borderWidth: 0.5, borderColor: item.hue + t.topicBorderAlpha, padding: 14 }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.hue }} />
+                    <TopicIcon topicKey={item.topicKey} color={item.hue} size={15} tileSize={30} />
                     <Text style={{ flex: 1, fontSize: 14.5, fontWeight: '600', color: t.ink }}>
                       {item.topicLabel}
                     </Text>
-                    <Text style={{ fontFamily: 'Georgia', fontSize: 18, fontWeight: '600', color: t.ink }}>
+                    <Text style={{ fontSize: 17, fontWeight: '700', color: t.ink }}>
                       {item.avgStars !== null ? `${item.avgStars}/5` : feedbackDash}
                     </Text>
                   </View>
@@ -103,7 +111,8 @@ export default function HistoryScreen() {
                     ) : null}
                   </View>
                 </View>
-              ))}
+                );
+              })}
             </View>
           ) : (
             <View style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, padding: 18 }}>
@@ -120,19 +129,22 @@ export default function HistoryScreen() {
             Recent anonymous feedback
           </Text>
           {feedbackLoading ? null : recent.length > 0 ? (
-            <View style={{ borderRadius: 12, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, overflow: 'hidden' }}>
-              {recent.map((item, index) => {
+            <View style={{ gap: 8 }}>
+              {recent.map((item) => {
                 const badge = formatFeedbackBadge(item.badge);
                 return (
                   <View
                     key={item.id}
-                    style={[
-                      { padding: 14 },
-                      index < recent.length - 1 ? { borderBottomWidth: 0.5, borderBottomColor: t.line } : undefined,
-                    ]}
+                    style={{
+                      padding: 14,
+                      borderRadius: 12,
+                      backgroundColor: item.hue + t.topicBgAlpha,
+                      borderWidth: 0.5,
+                      borderColor: item.hue + t.topicBorderAlpha,
+                    }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.hue }} />
+                      <TopicIcon topicKey={item.topicKey} color={item.hue} size={15} tileSize={30} />
                       <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: t.ink }}>
                         {item.topicLabel}
                       </Text>

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { theme } from '@/lib/theme';
+import { darkTheme, lightTheme } from '@/lib/theme';
 import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
@@ -45,7 +45,7 @@ export function useAppearance() {
   };
 }
 
-// TODO Phase 5: implement light theme tokens
 export function useTheme() {
-  return theme;
+  const { resolved } = useAppearance();
+  return resolved === 'light' ? lightTheme : darkTheme;
 }

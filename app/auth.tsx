@@ -138,7 +138,7 @@ export default function AuthScreen() {
             style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: t.amber }}
             activeOpacity={0.85}
           >
-            <Text style={{ fontSize: 15, fontWeight: '600', color: t.bg, letterSpacing: -0.1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: t.onAccent, letterSpacing: -0.1 }}>
               Back to sign in
             </Text>
           </TouchableOpacity>
@@ -218,7 +218,7 @@ export default function AuthScreen() {
           >
             {loading
               ? <ActivityIndicator color={t.bg} />
-              : <Text style={{ fontSize: 15, fontWeight: '600', color: t.bg, letterSpacing: -0.1 }}>
+              : <Text style={{ fontSize: 15, fontWeight: '600', color: t.onAccent, letterSpacing: -0.1 }}>
                   {mode === 'signin' ? 'Sign in' : 'Create account'}
                 </Text>
             }

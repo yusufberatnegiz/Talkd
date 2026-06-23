@@ -120,7 +120,7 @@ function CrisisSheet({ onClose }: { onClose: () => void }) {
               backgroundColor: canDismiss ? t.amber : t.bg3,
             }}
           >
-            <Text style={{ fontSize: 14.5, fontWeight: '600', color: canDismiss ? t.bg : t.ink4 }}>
+            <Text style={{ fontSize: 14.5, fontWeight: '600', color: canDismiss ? t.onAccent : t.ink4 }}>
               {canDismiss ? 'Continue talking' : `Please read… ${secsLeft}s`}
             </Text>
           </TouchableOpacity>
@@ -234,7 +234,7 @@ function ExitSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: () 
         onPress={onConfirm}
         style={{ paddingVertical: 14, borderRadius: 14, alignItems: 'center', backgroundColor: t.amber, marginBottom: 8 }}
       >
-        <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.bg }}>End & rate</Text>
+        <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.onAccent }}>End & rate</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={onClose} style={{ paddingVertical: 14, alignItems: 'center' }}>
         <Text style={{ fontSize: 14, color: t.ink3 }}>Keep talking</Text>
@@ -274,7 +274,7 @@ function ContinueSheet({ youAgreed, theyAgreed, onAgree, onDecline }: {
                   borderWidth: agreed ? 1 : 0.5, borderColor: agreed ? t.amber + '60' : t.line,
                 }}>
                   <Text style={{ fontSize: 11, color: t.ink3, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 }}>{label}</Text>
-                  <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: agreed ? t.amber : t.ink4 }}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '600', color: agreed ? t.amber : t.ink4 }}>
                     {agreed ? '✓ Agreed' : 'Deciding…'}
                   </Text>
                 </View>
@@ -291,7 +291,7 @@ function ContinueSheet({ youAgreed, theyAgreed, onAgree, onDecline }: {
                   backgroundColor: youAgreed ? t.bg3 : t.amber,
                 }}
               >
-                <Text style={{ fontSize: 14.5, fontWeight: '600', color: youAgreed ? t.ink3 : t.bg }}>
+                <Text style={{ fontSize: 14.5, fontWeight: '600', color: youAgreed ? t.ink3 : t.onAccent }}>
                   {youAgreed ? 'Waiting for them…' : 'Keep talking (no timer)'}
                 </Text>
               </TouchableOpacity>
@@ -671,7 +671,7 @@ export default function ChatScreen() {
           onPress={() => router.replace('/(tabs)' as never)}
           style={{ paddingVertical: 14, paddingHorizontal: 28, borderRadius: 99, backgroundColor: hue }}
         >
-          <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.bg }}>Go home</Text>
+          <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.onAccent }}>Go home</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -706,7 +706,7 @@ export default function ChatScreen() {
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: hue }} />
             </View>
             <View>
-              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15.5, color: t.ink, lineHeight: 18 }}>
+              <Text style={{ fontSize: 13.5, fontWeight: '600', color: t.ink, lineHeight: 18 }}>
                 Someone listening
               </Text>
               <Text style={{ fontSize: 10.5, color: t.ink3, marginTop: 1, letterSpacing: 0.3 }}>
@@ -750,7 +750,7 @@ export default function ChatScreen() {
                 backgroundColor: isWarning ? t.red : hue,
               }} />
             </View>
-            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 10.5, color: t.ink4 }}>
+            <Text style={{ fontSize: 10.5, color: t.ink4 }}>
               {isWarning ? 'ending soon' : 'session time'}
             </Text>
           </View>
@@ -759,7 +759,7 @@ export default function ChatScreen() {
         {untimed && (
           <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: hue }} />
-            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 11, color: t.ink3, letterSpacing: 0.1 }}>
+            <Text style={{ fontSize: 11, color: t.ink3, letterSpacing: 0.1 }}>
               Both of you chose to keep talking — no timer
             </Text>
           </View>
@@ -769,7 +769,7 @@ export default function ChatScreen() {
         {!!specific && (
           <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
             <View style={{ padding: 10, backgroundColor: t.bg2, borderRadius: 14, borderWidth: 0.5, borderColor: t.line }}>
-              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 12, color: t.ink3 }}>
+              <Text style={{ fontSize: 12, color: t.ink3 }}>
                 {specific_from === 'them' ? 'They wrote' : 'You wrote'}: "{specific}"
               </Text>
             </View>
@@ -817,7 +817,7 @@ export default function ChatScreen() {
               {[0, 1, 2].map(i => (
                 <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.ink3, opacity: 0.6 }} />
               ))}
-              <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 11, color: t.ink4, marginLeft: 4 }}>
+              <Text style={{ fontSize: 11, color: t.ink4, marginLeft: 4 }}>
                 They're thinking
               </Text>
             </View>
@@ -854,7 +854,7 @@ export default function ChatScreen() {
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 16, color: draft.trim() && !peerDisconnected ? t.bg : t.ink4 }}>↑</Text>
+              <Text style={{ fontSize: 16, color: draft.trim() && !peerDisconnected ? t.onAccent : t.ink4 }}>↑</Text>
             </TouchableOpacity>
           </View>
           {!!sendError && (

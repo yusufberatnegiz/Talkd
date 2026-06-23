@@ -1,3 +1,4 @@
+import { TopicIcon } from '@/components/TopicIcon';
 import { MATCH_TIMEOUT_MS } from '@/constants/config';
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
@@ -82,16 +83,16 @@ function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: stri
             borderRadius: 16,
             maxWidth: 300,
           }}>
-            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 15, color: t.ink2 }}>
-              &quot;{note || 'Someone wanted to talk.'}&quot;
-            </Text>
+          <Text style={{ fontSize: 13.5, fontWeight: '500', color: t.ink2 }}>
+            &quot;{note || 'Someone wanted to talk.'}&quot;
+          </Text>
           </View>
           <TouchableOpacity
             onPress={onBack}
             style={{ marginTop: 32, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 99, backgroundColor: hue }}
             activeOpacity={0.85}
           >
-            <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.bg }}>Keep looking</Text>
+            <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.onAccent }}>Keep looking</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => router.replace('/(tabs)')}
@@ -137,7 +138,6 @@ function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: stri
             borderWidth: 0.5,
             borderColor: t.line,
             color: t.ink,
-            fontFamily: 'Georgia',
             fontSize: 17,
             lineHeight: 24,
             textAlignVertical: 'top',
@@ -150,7 +150,7 @@ function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: stri
           onPress={() => setUnavailable(true)}
           style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: note.trim() ? hue : t.bg3 }}
         >
-          <Text style={{ fontSize: 15, fontWeight: '600', color: note.trim() ? t.bg : t.ink4 }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: note.trim() ? t.onAccent : t.ink4 }}>
             Check async availability
           </Text>
         </TouchableOpacity>
@@ -178,8 +178,10 @@ export default function MatchScreen() {
   const [pollKey, setPollKey] = useState(0);
   const [matchError, setMatchError] = useState<string | null>(null);
   const [matchedUi, setMatchedUi] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const matchedRef = useRef(false);
+  const cancellingRef = useRef(false);
 
   const intentLabel = {
     vent: 'to listen',
@@ -272,8 +274,11 @@ export default function MatchScreen() {
   }, [fallback, showOptions, queueType, pollKey, tp.key, specific, intent]);
 
   async function handleCancel() {
+    if (cancellingRef.current) return;
+    cancellingRef.current = true;
+    setCancelling(true);
     await cancelMatchQueue();
-    router.back();
+    router.replace('/(tabs)' as never);
   }
 
   if (fallback) {
@@ -299,18 +304,22 @@ export default function MatchScreen() {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
-          paddingHorizontal: 11,
+          paddingHorizontal: 10,
           paddingVertical: 5,
           borderRadius: 99,
           backgroundColor: tp.hue + '18',
           borderWidth: 0.5,
           borderColor: tp.hue + '44',
         }}>
-          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: tp.hue }} />
+          <TopicIcon topicKey={tp.key} color={tp.hue} size={10} tileSize={20} />
           <Text style={{ fontSize: 11, color: tp.hue, letterSpacing: 0.2 }}>{tp.label}</Text>
         </View>
-        <TouchableOpacity onPress={() => void handleCancel()} style={{ padding: 8 }}>
-          <Text style={{ fontSize: 13, color: t.ink3 }}>Cancel</Text>
+        <TouchableOpacity
+          onPress={() => void handleCancel()}
+          disabled={cancelling}
+          style={{ padding: 8, opacity: cancelling ? 0.45 : 1 }}
+        >
+          <Text style={{ fontSize: 13, color: t.ink3 }}>{cancelling ? 'Canceling...' : 'Cancel'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -338,7 +347,7 @@ export default function MatchScreen() {
                 style={{ paddingVertical: 16, borderRadius: 16, alignItems: 'center', backgroundColor: tp.hue }}
                 activeOpacity={0.85}
               >
-                <Text style={{ fontSize: 15, fontWeight: '600', color: t.bg }}>Keep waiting for a listener</Text>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: t.onAccent }}>Keep waiting for a listener</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => { setShowOptions(false); setQueueType('talker'); }}
@@ -370,8 +379,6 @@ export default function MatchScreen() {
               : 'Looking for someone in the same situation'}
           </Text>
           <Text style={{
-            fontFamily: 'Georgia',
-            fontStyle: 'italic',
             fontSize: 30,
             lineHeight: 36,
             letterSpacing: -0.3,

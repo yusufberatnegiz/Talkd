@@ -1,4 +1,4 @@
-import { theme } from '@/lib/theme';
+import { useTheme } from '@/hooks/useTheme';
 import { useRouter } from 'expo-router';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -12,7 +12,7 @@ const TABS: { label: Tab; route: string }[] = [
 
 export function BottomNav({ active }: { active: Tab }) {
   const router = useRouter();
-  const t = theme;
+  const t = useTheme();
 
   return (
     <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 0 }}>

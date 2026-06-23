@@ -1,4 +1,6 @@
+import { BrandMark } from '@/components/BrandMark';
 import { BottomNav } from '@/components/BottomNav';
+import { TopicIcon } from '@/components/TopicIcon';
 import { TOPICS } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
 import { cancelMatchQueue, findOrCreateMatch } from '@/lib/matching';
@@ -127,11 +129,11 @@ export default function ListenerScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 8 }}
         showsVerticalScrollIndicator={false}
+        overScrollMode="never"
+        bounces={false}
       >
         <View style={{ paddingHorizontal: 24, paddingTop: 14, flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 18, color: t.ink3 }}>
-            talkd - listener
-          </Text>
+          <BrandMark compact />
           {badgeCount !== null && badgeCount > 0 && (
             <Text style={{ fontSize: 11, color: t.ink4, letterSpacing: 1.5, textTransform: 'uppercase' }}>
               Your badges: {badgeCount}
@@ -176,8 +178,8 @@ export default function ListenerScreen() {
             }}
             activeOpacity={0.85}
           >
-            {online && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.bg }} />}
-            <Text style={{ fontSize: 14, fontWeight: '500', color: online ? t.bg : t.ink }}>
+            {online && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.onAccent }} />}
+            <Text style={{ fontSize: 14, fontWeight: '500', color: online ? t.onAccent : t.ink }}>
               {matched ? 'Connecting...' : online ? 'Live - tap to pause' : 'Go on duty'}
             </Text>
           </TouchableOpacity>
@@ -190,7 +192,7 @@ export default function ListenerScreen() {
 
         <View style={{ paddingHorizontal: 20 }}>
           <Text style={{ fontSize: 11, letterSpacing: 2, color: t.ink4, textTransform: 'uppercase', marginBottom: 10, paddingLeft: 4 }}>
-            Match me with
+            Topics
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {topicsArr.map(tp => {
@@ -201,14 +203,19 @@ export default function ListenerScreen() {
                   onPress={() => toggleTopic(tp.key)}
                   style={{
                     paddingVertical: 7,
-                    paddingHorizontal: 12,
+                    paddingLeft: 8,
+                    paddingRight: 12,
                     borderRadius: 99,
                     backgroundColor: active ? tp.hue + '28' : 'transparent',
                     borderWidth: active ? 1 : 0.5,
                     borderColor: active ? tp.hue + '80' : t.lineStrong,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
                   }}
                   activeOpacity={0.8}
                 >
+                  <TopicIcon topicKey={tp.key} color={active ? tp.hue : t.ink4} size={10} tileSize={20} />
                   <Text style={{ fontSize: 12, color: active ? tp.hue : t.ink2 }}>{tp.label}</Text>
                 </TouchableOpacity>
               );
@@ -218,8 +225,8 @@ export default function ListenerScreen() {
 
         {online && !matched && (
           <View style={{ paddingHorizontal: 40, paddingTop: 32, alignItems: 'center' }}>
-            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 16, color: t.ink3, textAlign: 'center' }}>
-              waiting for someone on your wavelength...
+            <Text style={{ fontSize: 13, fontWeight: '500', color: t.ink3, textAlign: 'center' }}>
+              waiting for someone to arrive...
             </Text>
           </View>
         )}

@@ -1,3 +1,4 @@
+import { TopicIcon } from '@/components/TopicIcon';
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -6,10 +7,10 @@ import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const INTENTS = [
-  { k: 'vent',   title: 'I need to vent',           sub: "Someone who won't interrupt" },
-  { k: 'advice', title: 'I want honest advice',      sub: 'Tell me what you actually think' },
-  { k: 'think',  title: 'Help me think it through',  sub: 'Questions, not answers' },
-  { k: 'chat',   title: 'Just want to chat',         sub: 'No pressure, no agenda' },
+  { k: 'vent',   title: 'I need to vent' },
+  { k: 'advice', title: 'I want honest advice' },
+  { k: 'think',  title: 'Help me think it through' },
+  { k: 'chat',   title: 'Just want to chat' },
 ] as const;
 
 type IntentKey = typeof INTENTS[number]['k'];
@@ -56,11 +57,11 @@ export default function IntentScreen() {
         <View style={{ paddingHorizontal: 28, paddingTop: 20, paddingBottom: 8 }}>
           <View style={{
             alignSelf: 'flex-start',
-            flexDirection: 'row', alignItems: 'center', gap: 6,
-            paddingHorizontal: 12, paddingVertical: 6,
+            flexDirection: 'row', alignItems: 'center', gap: 7,
+            paddingHorizontal: 10, paddingVertical: 5,
             borderRadius: 99, backgroundColor: tp.hue + '18', borderWidth: 0.5, borderColor: tp.hue + '44',
           }}>
-            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: tp.hue }} />
+            <TopicIcon topicKey={tp.key} color={tp.hue} size={11} tileSize={22} />
             <Text style={{ fontSize: 11.5, color: tp.hue, letterSpacing: 0.2 }}>{tp.label}</Text>
           </View>
         </View>
@@ -69,7 +70,7 @@ export default function IntentScreen() {
         <View style={{ paddingHorizontal: 28, paddingBottom: 24 }}>
           <Text style={{ fontFamily: 'Georgia', fontSize: 36, lineHeight: 40, letterSpacing: -0.6, color: t.ink }}>
             {'What do you want\n'}
-            <Text style={{ fontStyle: 'italic', color: t.amber }}>out of this?</Text>
+            <Text style={{ fontStyle: 'italic', color: tp.hue }}>out of this?</Text>
           </Text>
           <Text style={{ fontSize: 13, color: t.ink3, marginTop: 10, lineHeight: 18 }}>
             Helps us find someone on the same wavelength.
@@ -85,9 +86,9 @@ export default function IntentScreen() {
                 key={it.k}
                 onPress={() => setIntent(it.k)}
                 style={{
-                  backgroundColor: active ? t.amberSoft : t.bg3,
+                  backgroundColor: active ? tp.hue + '14' : t.bg3,
                   borderWidth: active ? 1 : 0.5,
-                  borderColor: active ? t.amber + '60' : t.line,
+                  borderColor: active ? tp.hue + '60' : t.line,
                   borderRadius: 16, padding: 14,
                   flexDirection: 'row', alignItems: 'center', gap: 12,
                 }}
@@ -95,17 +96,16 @@ export default function IntentScreen() {
               >
                 <View style={{
                   width: 18, height: 18, borderRadius: 9,
-                  borderWidth: 1.5, borderColor: active ? t.amber : t.ink5,
-                  backgroundColor: active ? t.amber : 'transparent',
+                  borderWidth: 1.5, borderColor: active ? tp.hue : t.ink5,
+                  backgroundColor: active ? tp.hue : 'transparent',
                   alignItems: 'center', justifyContent: 'center',
                 }}>
-                  {active && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: t.bg }} />}
+                  {active && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: t.onAccent }} />}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: 'Georgia', fontSize: 19, letterSpacing: -0.2, lineHeight: 23, color: t.ink }}>
+                  <Text style={{ fontSize: 16, fontWeight: '600', lineHeight: 22, color: active ? tp.hue : t.ink }}>
                     {it.title}
                   </Text>
-                  <Text style={{ fontSize: 12, color: t.ink3, marginTop: 1 }}>{it.sub}</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -125,7 +125,7 @@ export default function IntentScreen() {
             style={{
               width: '100%', padding: 14, borderRadius: 14,
               backgroundColor: t.bg2, borderWidth: 0.5, borderColor: t.line,
-              color: t.ink, fontFamily: 'Georgia', fontSize: 15,
+              color: t.ink, fontSize: 15,
             }}
           />
           <Text style={{ fontSize: 11, color: t.ink4, marginTop: 6, paddingLeft: 4, lineHeight: 15 }}>
@@ -140,12 +140,12 @@ export default function IntentScreen() {
             onPress={() => router.push({ pathname: '/match', params: { topic: tp.key, intent: intent ?? '', specific } } as never)}
             style={{
               paddingVertical: 16, borderRadius: 99, alignItems: 'center',
-              backgroundColor: intent ? t.amber : t.bg3,
+              backgroundColor: intent ? tp.hue : t.bg3,
             }}
             activeOpacity={0.85}
           >
-            <Text style={{ fontSize: 15, fontWeight: '600', letterSpacing: -0.1, color: intent ? t.bg : t.ink4 }}>
-              {intent ? 'Find someone now' : 'Pick one above'}
+            <Text style={{ fontSize: 15, fontWeight: '600', letterSpacing: -0.1, color: intent ? t.onAccent : t.ink4 }}>
+              {intent ? 'Find someone now' : 'Choose one'}
             </Text>
           </TouchableOpacity>
         </View>

@@ -1,6 +1,7 @@
 import { SESSION_DURATION_SECONDS, SESSION_WARNING_SECONDS } from '@/constants/config';
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
+import { Sentry } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import { moderateMessage } from '@/lib/moderation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -399,9 +400,15 @@ export default function ChatScreen() {
 
   // Load user ID
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
-    });
+    supabase.auth.getUser()
+      .then(({ data: { user } }) => {
+        if (user) setUserId(user.id);
+      })
+      .catch((error: unknown) => {
+        console.warn('Could not load chat user', error);
+        Sentry.captureException(error);
+        setJoinError('Could not load your account. Check your connection and try again.');
+      });
   }, []);
 
   // Channel subscription
@@ -415,15 +422,26 @@ export default function ChatScreen() {
       setJoinError('');
       setSessionOtherUserId(null);
 
-      const { data, error } = await supabase
-        .from('sessions')
-        .select('participant_a,participant_b,status')
-        .eq('id', sessionId)
-        .maybeSingle();
+      let data: SessionAccessRow | null = null;
+      let error: unknown = null;
+
+      try {
+        const response = await supabase
+          .from('sessions')
+          .select('participant_a,participant_b,status')
+          .eq('id', sessionId)
+          .maybeSingle();
+        data = response.data as SessionAccessRow | null;
+        error = response.error;
+      } catch (queryError: unknown) {
+        error = queryError;
+        console.warn('Could not load chat session', queryError);
+        Sentry.captureException(queryError);
+      }
 
       if (isCancelled) return;
 
-      const session = data as SessionAccessRow | null;
+      const session = data;
       const isParticipant = session?.participant_a === userId || session?.participant_b === userId;
       const verifiedOtherUserId = session?.participant_a === userId
         ? session?.participant_b
@@ -528,7 +546,11 @@ export default function ChatScreen() {
       channelRef.current = channel;
     }
 
-    void setupChannel();
+    void setupChannel().catch((error: unknown) => {
+      console.warn('Could not set up chat channel', error);
+      Sentry.captureException(error);
+      if (!isCancelled) setJoinError('Could not connect to this conversation. Check your connection and try again.');
+    });
 
     return () => {
       isCancelled = true;
@@ -634,7 +656,7 @@ export default function ChatScreen() {
         payload: { id: messageId, text, ts: sentAt },
       });
       if (sendResult !== 'ok') {
-        console.error('Realtime message send failed', sendResult);
+        console.warn('Realtime message send failed', sendResult);
         setSendError('Message could not be sent. Check your connection and try again.');
         return;
       }
@@ -642,7 +664,7 @@ export default function ChatScreen() {
       setMessages(prev => [...prev, { id: messageId, from: 'me', text, time: sentAt }]);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (error: unknown) {
-      console.error('Message send failed', error);
+      console.warn('Message send failed', error);
       setSendError('Safety check is busy. Please try again in a moment.');
     } finally {
       sendingRef.current = false;

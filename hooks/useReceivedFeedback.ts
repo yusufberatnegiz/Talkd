@@ -1,4 +1,5 @@
 import { getTopic } from '@/constants/topics';
+import { Sentry } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
 
@@ -120,6 +121,9 @@ export function useReceivedFeedback() {
             badge: formatFeedbackBadge(row.badge),
           };
         }));
+      } catch (error: unknown) {
+        console.warn('Could not load received feedback', error);
+        Sentry.captureException(error);
       } finally {
         if (!isCancelled) setLoading(false);
       }

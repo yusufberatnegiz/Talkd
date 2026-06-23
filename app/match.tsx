@@ -256,7 +256,7 @@ export default function MatchScreen() {
           } as never);
         }, 1500);
       } catch (error: unknown) {
-        console.error('Match polling failed', error);
+        console.warn('Match polling failed', error);
         if (!isCancelled) {
           setMatchError('Could not search for a match. Please try again.');
         }

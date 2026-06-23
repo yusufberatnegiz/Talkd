@@ -1,5 +1,6 @@
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
+import { Sentry } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -40,9 +41,18 @@ export default function RatingScreen() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
-    });
+    async function loadUser() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) setUserId(user.id);
+      } catch (loadError: unknown) {
+        console.warn('Could not load rating user', loadError);
+        Sentry.captureException(loadError);
+        setError('Could not load your account. Check your connection and try again.');
+      }
+    }
+
+    void loadUser();
   }, []);
 
   const isPositive = stars >= 3;

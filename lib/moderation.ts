@@ -14,12 +14,12 @@ export async function moderateMessage(text: string): Promise<{
   });
 
   if (error) {
-    console.error('Moderation function failed', error);
+    console.warn('Moderation function failed', error);
     throw new Error('Moderation is temporarily busy.');
   }
 
   if (typeof data?.isSafe !== 'boolean' || typeof data?.isCrisis !== 'boolean') {
-    console.error('Moderation function returned an invalid response');
+    console.warn('Moderation function returned an invalid response');
     throw new Error('Moderation is temporarily busy.');
   }
 

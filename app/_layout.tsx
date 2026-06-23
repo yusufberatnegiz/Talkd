@@ -1,5 +1,6 @@
 import { Sentry, initSentry } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
+import { ensureOwnProfile } from '@/lib/profile';
 import { hasAcceptedSafetyGuidelines, subscribeSafetyAcceptance } from '@/lib/safetyAcceptance';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -16,7 +17,13 @@ function RootLayout() {
   const [safetyAccepted, setSafetyAccepted] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => setSession(s));
+    supabase.auth.getSession()
+      .then(({ data: { session: s } }) => setSession(s))
+      .catch((error: unknown) => {
+        console.warn('Could not restore auth session', error);
+        Sentry.captureException(error);
+        setSession(null);
+      });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
     });
@@ -38,8 +45,15 @@ function RootLayout() {
       }
 
       setSafetyAccepted(undefined);
-      const accepted = await hasAcceptedSafetyGuidelines();
-      if (!isCancelled) setSafetyAccepted(accepted);
+      try {
+        await ensureOwnProfile();
+        const accepted = await hasAcceptedSafetyGuidelines();
+        if (!isCancelled) setSafetyAccepted(accepted);
+      } catch (error: unknown) {
+        console.warn('Could not prepare signed-in account', error);
+        Sentry.captureException(error);
+        if (!isCancelled) setSafetyAccepted(false);
+      }
     }
 
     void loadSafetyAcceptance();

@@ -30,7 +30,7 @@ export async function hasAcceptedSafetyGuidelines(): Promise<boolean> {
     .maybeSingle();
 
   if (error) {
-    console.error('Could not load safety acceptance', error);
+    console.warn('Could not load safety acceptance', error);
     return false;
   }
 
@@ -62,7 +62,7 @@ export async function markSafetyGuidelinesAccepted(): Promise<void> {
     .upsert({ id: user.id, safety_accepted_at: acceptedAt }, { onConflict: 'id' });
 
   if (upsertError) {
-    console.error('Could not save safety acceptance', upsertError);
+    console.warn('Could not save safety acceptance', upsertError);
     throw new Error('Could not save safety acceptance.');
   }
 

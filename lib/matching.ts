@@ -42,7 +42,7 @@ export async function findOrCreateMatch(input: {
   });
 
   if (error) {
-    console.error('Match queue RPC failed', error);
+    console.warn('Match queue RPC failed', error);
     throw new Error('Could not search for a match.');
   }
 
@@ -54,6 +54,6 @@ export async function cancelMatchQueue(): Promise<void> {
   const { error } = await supabase.rpc('cancel_match_queue');
 
   if (error) {
-    console.error('Cancel match queue RPC failed', error);
+    console.warn('Cancel match queue RPC failed', error);
   }
 }

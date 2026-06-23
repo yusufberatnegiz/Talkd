@@ -1,10 +1,11 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/hooks/useTheme';
+import { Sentry } from '@/lib/sentry';
 
 type Mode = 'signin' | 'signup';
 
@@ -35,29 +36,41 @@ function validatePassword(value: string, mode: Mode): string | null {
 function getAuthErrorMessage(message: string, mode: Mode): string {
   const m = message.toLowerCase();
   if (m.includes('invalid login credentials')) {
-    return 'We could not sign you in. Check your email and password.';
+    return 'No account was found for that email, or the password is incorrect.';
   }
   if (m.includes('email not confirmed')) {
-    return 'Please confirm your email address before signing in.';
+    return 'This email is registered but not confirmed yet. Open the confirmation email, then sign in.';
   }
   if (m.includes('already registered') || m.includes('already exists') || m.includes('user already registered')) {
-    return 'An account already exists for this email. Switch to sign in instead.';
+    return 'This email already has a Talkd account. Switch to sign in instead.';
   }
   if (m.includes('password') && (m.includes('six') || m.includes('6') || m.includes('short'))) {
-    return 'Password must be at least 6 characters.';
+    return 'That password is too short. Use at least 6 characters.';
   }
   if (m.includes('invalid') && m.includes('email')) {
-    return 'Enter a valid email address, like name@example.com.';
+    return 'That email address does not look valid. Use something like name@example.com.';
   }
   if (m.includes('rate limit') || m.includes('too many')) {
-    return 'Too many attempts. Please wait a moment and try again.';
+    return 'Too many sign-in attempts. Wait a moment, then try again.';
   }
   if (m.includes('network') || m.includes('fetch')) {
     return 'Could not connect. Check your internet connection and try again.';
   }
   return mode === 'signup'
-    ? 'Could not create your account. Check the details and try again.'
-    : 'Could not sign you in. Check the details and try again.';
+    ? 'Could not create the account. Check your email and password, then try again.'
+    : 'Could not sign in. Check your email and password, then try again.';
+}
+
+function getErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
+  const code = error.code;
+  return typeof code === 'string' ? code : null;
+}
+
+function getErrorMessage(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('message' in error)) return null;
+  const message = error.message;
+  return typeof message === 'string' ? message : null;
 }
 
 export default function AuthScreen() {
@@ -67,13 +80,35 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const [error, setError] = useState('');
   const [checkEmail, setCheckEmail] = useState(false);
 
   const clearError = () => { if (error) setError(''); };
 
+  useEffect(() => {
+    let isMounted = true;
+
+    AppleAuthentication.isAvailableAsync()
+      .then(isAvailable => {
+        if (isMounted) setAppleAvailable(isAvailable);
+      })
+      .catch((availabilityError: unknown) => {
+        console.warn('Could not check Apple sign in availability', availabilityError);
+        Sentry.captureException(availabilityError);
+        if (isMounted) setAppleAvailable(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   async function handleApple() {
+    if (appleLoading) return;
     setError('');
+    setAppleLoading(true);
     try {
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [AppleAuthentication.AppleAuthenticationScope.EMAIL],
@@ -86,10 +121,22 @@ export default function AuthScreen() {
         provider: 'apple',
         token: credential.identityToken,
       });
-      if (authError) setError('Apple sign in could not be completed. Please try again.');
+      if (authError) {
+        console.warn('Apple sign in was rejected by Supabase', authError);
+        Sentry.captureException(authError);
+        setError(__DEV__
+          ? `Apple sign in failed: ${authError.message}`
+          : 'Apple sign in could not be completed. Please try again.');
+      }
     } catch (e: unknown) {
-      const err = e as { code?: string };
-      if (err.code !== 'ERR_REQUEST_CANCELED') setError('Apple sign in failed.');
+      if (getErrorCode(e) !== 'ERR_REQUEST_CANCELED') {
+        console.warn('Apple sign in failed before Supabase auth', e);
+        Sentry.captureException(e);
+        const message = getErrorMessage(e);
+        setError(__DEV__ && message ? `Apple sign in failed: ${message}` : 'Apple sign in failed.');
+      }
+    } finally {
+      setAppleLoading(false);
     }
   }
 
@@ -168,21 +215,25 @@ export default function AuthScreen() {
               : 'Create an account — you\'ll always appear as Anonymous.'}
           </Text>
 
-          {/* Apple Sign In */}
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-            cornerRadius={99}
-            style={{ width: '100%', height: 52, marginBottom: 20 }}
-            onPress={handleApple}
-          />
+          {appleAvailable && (
+            <>
+              {/* Apple Sign In */}
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={99}
+                style={{ width: '100%', height: 52, marginBottom: 20, opacity: appleLoading ? 0.65 : 1 }}
+                onPress={handleApple}
+              />
 
-          {/* Divider */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-            <View style={{ flex: 1, height: 0.5, backgroundColor: t.line }} />
-            <Text style={{ fontSize: 11, letterSpacing: 1.5, color: t.ink4, textTransform: 'uppercase' }}>or</Text>
-            <View style={{ flex: 1, height: 0.5, backgroundColor: t.line }} />
-          </View>
+              {/* Divider */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                <View style={{ flex: 1, height: 0.5, backgroundColor: t.line }} />
+                <Text style={{ fontSize: 11, letterSpacing: 1.5, color: t.ink4, textTransform: 'uppercase' }}>or</Text>
+                <View style={{ flex: 1, height: 0.5, backgroundColor: t.line }} />
+              </View>
+            </>
+          )}
 
           {/* Email + Password */}
           <TextInput

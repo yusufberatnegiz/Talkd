@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { Sentry } from '@/lib/sentry';
 import { useEffect, useState } from 'react';
 
 export type UserStats = {
@@ -49,11 +50,14 @@ export function useUserStats() {
           totalMinutes: Math.round(totalSeconds / 60),
           avgRating,
         });
+      } catch (error: unknown) {
+        console.warn('Could not load user stats', error);
+        Sentry.captureException(error);
       } finally {
         setLoading(false);
       }
     }
-    load();
+    void load();
   }, []);
 
   return { stats, loading };

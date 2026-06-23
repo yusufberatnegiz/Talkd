@@ -4,6 +4,7 @@ import { TopicIcon } from '@/components/TopicIcon';
 import { TOPICS } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
 import { cancelMatchQueue, findOrCreateMatch } from '@/lib/matching';
+import { Sentry } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -25,18 +26,27 @@ export default function ListenerScreen() {
   const topicsArr = Object.values(TOPICS);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return;
-      setUserId(user.id);
-      const { data } = await supabase
-        .from('session_ratings_public')
-        .select('badge_count')
-        .eq('rated_user_id', user.id)
-        .maybeSingle();
-      if (data) {
-        setBadgeCount((data as { badge_count: number | null }).badge_count ?? 0);
+    async function loadListenerProfile() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        setUserId(user.id);
+        const { data } = await supabase
+          .from('session_ratings_public')
+          .select('badge_count')
+          .eq('rated_user_id', user.id)
+          .maybeSingle();
+        if (data) {
+          setBadgeCount((data as { badge_count: number | null }).badge_count ?? 0);
+        }
+      } catch (error: unknown) {
+        console.warn('Could not load listener profile', error);
+        Sentry.captureException(error);
+        setTopicError('Could not load your listener status. Check your connection and try again.');
       }
-    });
+    }
+
+    void loadListenerProfile();
   }, []);
 
   useEffect(() => {
@@ -85,7 +95,7 @@ export default function ListenerScreen() {
           } as never);
         }, 1500);
       } catch (error: unknown) {
-        console.error('Listener match polling failed', error);
+        console.warn('Listener match polling failed', error);
         if (!isCancelled) {
           setTopicError('Could not search for a match. Try going on duty again.');
         }

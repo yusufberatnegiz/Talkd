@@ -9,7 +9,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function PrivacyScreen() {
   const t = useTheme();
   const router = useRouter();
-  const [noticeMessage, setNoticeMessage] = useState('');
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -17,11 +16,6 @@ export default function PrivacyScreen() {
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.replace('/auth');
-  }
-
-  function handleExport() {
-    setNoticeMessage('Data export is coming soon.');
-    setTimeout(() => setNoticeMessage(''), 2500);
   }
 
   async function handleDeleteAccount() {
@@ -61,21 +55,6 @@ export default function PrivacyScreen() {
 
       {/* Items */}
       <View style={{ paddingHorizontal: 20, gap: 10 }}>
-
-        {/* Export */}
-        <View style={{ borderRadius: 16, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, overflow: 'hidden' }}>
-          <TouchableOpacity
-            onPress={handleExport}
-            style={{ paddingHorizontal: 20, paddingVertical: 18 }}
-            activeOpacity={0.7}
-          >
-            <Text style={{ fontSize: 15, fontWeight: '500', color: t.ink }}>Data export</Text>
-            <Text style={{ fontSize: 12.5, color: t.ink3, marginTop: 3 }}>
-              Coming soon for session activity, ratings, and safety records.
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Account deletion */}
         <View style={{ borderRadius: 16, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.line, overflow: 'hidden' }}>
           <TouchableOpacity
@@ -92,12 +71,6 @@ export default function PrivacyScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-
-        {!!noticeMessage && (
-          <Text style={{ paddingHorizontal: 4, fontSize: 12, color: t.amber, letterSpacing: 0.2, lineHeight: 18 }}>
-            {noticeMessage}
-          </Text>
-        )}
 
         {/* Sign out */}
         <View style={{ borderRadius: 16, backgroundColor: t.bg3, borderWidth: 0.5, borderColor: t.red + '40', overflow: 'hidden' }}>

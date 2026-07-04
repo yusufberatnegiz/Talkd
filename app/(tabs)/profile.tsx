@@ -82,7 +82,7 @@ export default function ProfileScreen() {
     {
       section: 'Preferences',
       items: [
-        { icon: Bell, label: 'Notifications', value: 'On', onPress: () => Linking.openSettings() },
+        { icon: Bell, label: 'Notifications', value: 'Device settings', onPress: () => Linking.openSettings() },
         { icon: Moon, label: 'Appearance', value: APPEARANCE_LABEL[appearance], onPress: () => setAppearanceOpen(true) },
         { icon: Shield, label: 'Privacy & data', onPress: () => router.push('/privacy' as never) },
       ],

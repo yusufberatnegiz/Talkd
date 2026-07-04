@@ -28,6 +28,9 @@
 - [ ] Profile row creation on first sign-in
 - [ ] Onboarding completion persistence
 
+## Later Reminders
+- [ ] Set up premium features after stabilization, safety, and release-readiness work.
+
 ---
 
 ## Blockers

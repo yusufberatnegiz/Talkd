@@ -35,6 +35,7 @@
     "@types/react": "~19.1.0",
     "babel-preset-expo": "~54.0.10",
     "eslint": "^9.30.1",
+    "supabase": "^2.109.0",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.39.0"
   },

@@ -488,6 +488,19 @@ export type Database = {
         Args: { input_session_id: string; input_user_id: string }
         Returns: boolean
       }
+      submit_session_rating: {
+        Args: {
+          p_badge?: string
+          p_private_note?: string
+          p_session_id: string
+          p_stars?: number
+        }
+        Returns: string
+      }
+      submit_session_report: {
+        Args: { p_details?: string; p_reason: string; p_session_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

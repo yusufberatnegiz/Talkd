@@ -2,6 +2,7 @@ import { SESSION_DURATION_SECONDS, SESSION_WARNING_SECONDS } from '@/constants/c
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
 import { Sentry } from '@/lib/sentry';
+import { submitSessionReport } from '@/lib/sessionFeedback';
 import { supabase } from '@/lib/supabase';
 import { moderateMessage } from '@/lib/moderation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -132,13 +133,11 @@ function CrisisSheet({ onClose }: { onClose: () => void }) {
 }
 
 function ReportSheet({
-  onClose, onConfirm, sessionId, reporterId, reportedUserId,
+  onClose, onConfirm, sessionId,
 }: {
   onClose: () => void;
   onConfirm: () => void;
   sessionId: string;
-  reporterId: string;
-  reportedUserId: string;
 }) {
   const t = useTheme();
   const [picked, setPicked] = useState<string | null>(null);
@@ -148,23 +147,17 @@ function ReportSheet({
 
   async function handleSubmit() {
     if (!picked) return;
-    if (!sessionId || !reporterId || !reportedUserId) {
+    if (!sessionId) {
       setError('Report could not be sent because this session is missing details.');
       return;
     }
     setSubmitting(true);
     setError('');
     try {
-      const { error: reportError } = await supabase.from('reports').insert({
-        session_id: sessionId,
-        reporter_id: reporterId,
-        reported_user_id: reportedUserId,
+      await submitSessionReport({
+        sessionId,
         reason: REASON_MAP[picked],
       });
-      if (reportError) {
-        setError('Report could not be sent. Check your connection and try again.');
-        return;
-      }
       onConfirm();
     } catch {
       setError('Report could not be sent. Check your connection and try again.');
@@ -898,8 +891,6 @@ export default function ChatScreen() {
           onClose={() => setReportOpen(false)}
           onConfirm={() => void goToRating()}
           sessionId={sessionId ?? ''}
-          reporterId={userId}
-          reportedUserId={sessionOtherUserId}
         />
       )}
       {exitOpen && (

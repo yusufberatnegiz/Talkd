@@ -1,6 +1,7 @@
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
 import { Sentry } from '@/lib/sentry';
+import { submitSessionRating } from '@/lib/sessionFeedback';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -26,8 +27,8 @@ const STAR_LABELS = ['', 'Not great', 'Okay', 'Good', 'Really helpful', 'The bes
 export default function RatingScreen() {
   const t = useTheme();
   const router = useRouter();
-  const { topic: topicParam, session_id: sessionId, other_user_id: otherUserId, my_role: myRole } = useLocalSearchParams<{
-    topic?: string; session_id?: string; other_user_id?: string; my_role?: string;
+  const { topic: topicParam, session_id: sessionId, my_role: myRole } = useLocalSearchParams<{
+    topic?: string; session_id?: string; my_role?: string;
   }>();
   const tp = getTopic(topicParam ?? 'any');
   const ratedRole = myRole === 'listener' ? 'talker' : 'listener';
@@ -69,25 +70,19 @@ export default function RatingScreen() {
       setSubmitted(true);
       return;
     }
-    if (!userId || !sessionId || !otherUserId) {
+    if (!userId || !sessionId) {
       setError('Your rating could not be saved because this session is missing details.');
       return;
     }
     setSubmitting(true);
     setError('');
     try {
-      const { error: ratingError } = await supabase.from('session_ratings').insert({
-        session_id: sessionId,
-        rater_id: userId,
-        rated_user_id: otherUserId,
+      await submitSessionRating({
+        sessionId,
         stars: stars || null,
         badge: picked,
-        private_note: note.trim() || null,
+        privateNote: note.trim() || null,
       });
-      if (ratingError) {
-        setError('Your rating could not be saved. Check your connection and try again.');
-        return;
-      }
       setSubmitted(true);
     } catch {
       setError('Your rating could not be saved. Check your connection and try again.');

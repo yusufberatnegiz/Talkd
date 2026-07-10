@@ -447,6 +447,7 @@ export type Database = {
       }
     }
     Functions: {
+      accept_safety_guidelines: { Args: never; Returns: string }
       answer_async_message: {
         Args: { p_message_id: string }
         Returns: undefined
@@ -468,6 +469,7 @@ export type Database = {
         Args: { p_duration_seconds: number; p_session_id: string }
         Returns: undefined
       }
+      ensure_own_profile: { Args: never; Returns: string }
       find_or_create_match: {
         Args: {
           p_allow_talker_fallback?: boolean

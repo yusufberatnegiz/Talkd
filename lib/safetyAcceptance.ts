@@ -44,25 +44,10 @@ export async function markSafetyGuidelinesAccepted(): Promise<void> {
     throw new Error('Sign in is required.');
   }
 
-  const acceptedAt = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ safety_accepted_at: acceptedAt })
-    .eq('id', user.id)
-    .select('id')
-    .maybeSingle();
+  const { error } = await supabase.rpc('accept_safety_guidelines');
 
-  if (!error && data) {
-    notifySafetyAcceptance(true);
-    return;
-  }
-
-  const { error: upsertError } = await supabase
-    .from('profiles')
-    .upsert({ id: user.id, safety_accepted_at: acceptedAt }, { onConflict: 'id' });
-
-  if (upsertError) {
-    console.warn('Could not save safety acceptance', upsertError);
+  if (error) {
+    console.warn('Could not save safety acceptance', error);
     throw new Error('Could not save safety acceptance.');
   }
 

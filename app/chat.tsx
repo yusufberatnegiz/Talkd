@@ -2,6 +2,7 @@ import { SESSION_DURATION_SECONDS, SESSION_WARNING_SECONDS } from '@/constants/c
 import { getTopic } from '@/constants/topics';
 import { useTheme } from '@/hooks/useTheme';
 import { Sentry } from '@/lib/sentry';
+import { endSession } from '@/lib/sessionLifecycle';
 import { submitSessionReport } from '@/lib/sessionFeedback';
 import { supabase } from '@/lib/supabase';
 import { moderateMessage } from '@/lib/moderation';
@@ -35,6 +36,12 @@ interface SessionAccessRow {
 interface PresenceMeta {
   user_id?: string;
   online_at?: string;
+}
+
+interface GoToRatingOptions {
+  notifyPeer?: boolean;
+  otherUserIdOverride?: string;
+  delayMs?: number;
 }
 
 const PEER_DISCONNECT_GRACE_MS = 5000;
@@ -309,8 +316,11 @@ export default function ChatScreen() {
   const peerDisconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heartbeatCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ratingNavigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPeerHeartbeatRef = useRef<number | null>(null);
   const disconnectSessionMarkedRef = useRef(false);
+  const endingRef = useRef(false);
+  const timeLeftRef = useRef(SESSION_DURATION_SECONDS);
 
   const {
     topic: topicParam, specific, specific_from,
@@ -341,6 +351,10 @@ export default function ChatScreen() {
   const [sessionOtherUserId, setSessionOtherUserId] = useState<string | null>(null);
   const [peerDisconnected, setPeerDisconnected] = useState(false);
   const sendingRef = useRef(false);
+
+  useEffect(() => {
+    timeLeftRef.current = timeLeft;
+  }, [timeLeft]);
 
   function formatClock() {
     const d = new Date();
@@ -377,6 +391,17 @@ export default function ChatScreen() {
       clearInterval(heartbeatCheckIntervalRef.current);
       heartbeatCheckIntervalRef.current = null;
     }
+  }
+
+  function clearRatingNavigationTimeout() {
+    if (ratingNavigationTimeoutRef.current) {
+      clearTimeout(ratingNavigationTimeoutRef.current);
+      ratingNavigationTimeoutRef.current = null;
+    }
+  }
+
+  function getElapsedSeconds() {
+    return Math.min(7200, Math.max(0, SESSION_DURATION_SECONDS - timeLeftRef.current));
   }
 
   function markPeerSeen() {
@@ -497,19 +522,7 @@ export default function ChatScreen() {
           setTyping(payload.isTyping);
         })
         .on('broadcast', { event: 'session_end' }, () => {
-          clearPeerDisconnectTimeout();
-          clearHeartbeatIntervals();
-          if (channelRef.current) {
-            void supabase.removeChannel(channelRef.current);
-            channelRef.current = null;
-          }
-          setMessages([]);
-          setTimeout(() => {
-            router.replace({
-              pathname: '/rating',
-              params: { topic: tp.key, session_id: sessionId, other_user_id: verifiedOtherUserId, my_role: myRole ?? '' },
-            } as never);
-          }, 700);
+          void goToRating({ notifyPeer: false, otherUserIdOverride: verifiedOtherUserId, delayMs: 700 });
         })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
@@ -525,11 +538,10 @@ export default function ChatScreen() {
                 setPeerDisconnected(true);
                 if (!disconnectSessionMarkedRef.current) {
                   disconnectSessionMarkedRef.current = true;
-                  void supabase
-                    .from('sessions')
-                    .update({ status: 'ended', ended_at: new Date().toISOString() })
-                    .eq('id', sessionId)
-                    .eq('status', 'active');
+                  void endSession({ sessionId, durationSeconds: getElapsedSeconds() }).catch((error: unknown) => {
+                    console.warn('Could not mark disconnected session ended', error);
+                    Sentry.captureException(error);
+                  });
                 }
               }
             }, 1000);
@@ -550,6 +562,7 @@ export default function ChatScreen() {
       if (typingIdleTimeoutRef.current) clearTimeout(typingIdleTimeoutRef.current);
       clearPeerDisconnectTimeout();
       clearHeartbeatIntervals();
+      clearRatingNavigationTimeout();
       lastPeerHeartbeatRef.current = null;
       if (channelRef.current) {
         void supabase.removeChannel(channelRef.current);
@@ -561,7 +574,7 @@ export default function ChatScreen() {
 
   // Timer countdown
   useEffect(() => {
-    if (!timerActive || untimed) return;
+    if (!timerActive || untimed || endingRef.current) return;
     if (timeLeft <= 0) {
       setTimerActive(false);
       setContinueOpen(true);
@@ -583,28 +596,58 @@ export default function ChatScreen() {
     scrollRef.current?.scrollToEnd({ animated: false });
   }, [messages, typing]);
 
-  async function goToRating() {
-    const ratingOtherUserId = sessionOtherUserId ?? otherUserId ?? '';
+  async function goToRating(options: GoToRatingOptions = {}) {
+    if (endingRef.current) return;
+    endingRef.current = true;
+
+    const ratingOtherUserId = options.otherUserIdOverride ?? sessionOtherUserId ?? otherUserId ?? '';
+    setTimerActive(false);
+    setReportOpen(false);
+    setExitOpen(false);
+    setContinueOpen(false);
+    clearPeerDisconnectTimeout();
+    clearHeartbeatIntervals();
+    clearRatingNavigationTimeout();
 
     if (sessionId) {
-      await supabase
-        .from('sessions')
-        .update({ status: 'ended', ended_at: new Date().toISOString() })
-        .eq('id', sessionId);
+      try {
+        await endSession({ sessionId, durationSeconds: getElapsedSeconds() });
+      } catch (error: unknown) {
+        console.warn('Could not end session metadata', error);
+        Sentry.captureException(error);
+      }
     }
 
-    if (channelRef.current) {
-      clearPeerDisconnectTimeout();
-      clearHeartbeatIntervals();
-      await channelRef.current.send({ type: 'broadcast', event: 'session_end', payload: {} });
-      await supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
+    const channel = channelRef.current;
+    channelRef.current = null;
+    if (channel) {
+      try {
+        if (options.notifyPeer !== false) {
+          await channel.send({ type: 'broadcast', event: 'session_end', payload: {} });
+        }
+      } catch (error: unknown) {
+        console.warn('Could not broadcast session end', error);
+        Sentry.captureException(error);
+      } finally {
+        await supabase.removeChannel(channel);
+      }
     }
-    setMessages([]);
-    router.replace({
-      pathname: '/rating',
-      params: { topic: tp.key, session_id: sessionId ?? '', other_user_id: ratingOtherUserId, my_role: myRole ?? '' },
-    } as never);
+
+    const navigate = () => {
+      ratingNavigationTimeoutRef.current = null;
+      setMessages([]);
+      router.replace({
+        pathname: '/rating',
+        params: { topic: tp.key, session_id: sessionId ?? '', other_user_id: ratingOtherUserId, my_role: myRole ?? '' },
+      } as never);
+    };
+
+    if (options.delayMs && options.delayMs > 0) {
+      ratingNavigationTimeoutRef.current = setTimeout(navigate, options.delayMs);
+      return;
+    }
+
+    navigate();
   }
 
   function handleDraftChange(text: string) {

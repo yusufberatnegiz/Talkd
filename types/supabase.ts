@@ -466,7 +466,7 @@ export type Database = {
         Returns: string
       }
       end_session: {
-        Args: { p_duration_seconds: number; p_session_id: string }
+        Args: { p_duration_seconds?: number; p_session_id: string }
         Returns: undefined
       }
       ensure_own_profile: { Args: never; Returns: string }

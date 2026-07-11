@@ -1,13 +1,18 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/hooks/useTheme';
 import { Sentry } from '@/lib/sentry';
+import { getPasswordRecoveryParamsFromUrl, setPasswordRecoveryActive } from '@/lib/passwordRecovery';
 
 type Mode = 'signin' | 'signup';
+
+const AUTH_EMAIL = 'auth@talkd.mobile';
+const SUPPORT_EMAIL = 'support@talkd.mobile';
+const PASSWORD_RECOVERY_REDIRECT_URL = 'talkd://auth?type=recovery';
 
 const EMAIL_PATTERN = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 const TURKISH_LETTER_PATTERN = /[çğıöşüÇĞİÖŞÜ]/;
@@ -31,6 +36,10 @@ function validatePassword(value: string, mode: Mode): string | null {
   if (!value) return 'Enter your password.';
   if (mode === 'signup' && value.length < 6) return 'Password must be at least 6 characters.';
   return null;
+}
+
+function getCleanEmail(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 function getAuthErrorMessage(message: string, mode: Mode): string {
@@ -84,6 +93,14 @@ export default function AuthScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [error, setError] = useState('');
   const [checkEmail, setCheckEmail] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [resending, setResending] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [mailMessage, setMailMessage] = useState('');
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [updatingPassword, setUpdatingPassword] = useState(false);
 
   const clearError = () => { if (error) setError(''); };
 
@@ -102,6 +119,65 @@ export default function AuthScreen() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function openPasswordRecoveryUrl(url: string | null) {
+      if (!url) return;
+      const recoveryParams = getPasswordRecoveryParamsFromUrl(url);
+      if (!recoveryParams) return;
+
+      setPasswordRecoveryActive(true);
+      setCheckEmail(false);
+      setRecoveryMode(false);
+      setError('');
+      setMailMessage('');
+      setPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+
+      try {
+        const { error: sessionError } = recoveryParams.kind === 'code'
+          ? await supabase.auth.exchangeCodeForSession(recoveryParams.code)
+          : await supabase.auth.setSession({
+              access_token: recoveryParams.accessToken,
+              refresh_token: recoveryParams.refreshToken,
+            });
+
+        if (!isMounted) return;
+        if (sessionError) {
+          setPasswordRecoveryActive(false);
+          setError('This password reset link could not be opened. Request a new reset email.');
+          return;
+        }
+
+        setRecoveryMode(true);
+        setMailMessage('Set a new password to finish account recovery.');
+      } catch (recoveryError: unknown) {
+        if (!isMounted) return;
+        console.warn('Could not open password recovery link', recoveryError);
+        Sentry.captureException(recoveryError);
+        setPasswordRecoveryActive(false);
+        setError('This password reset link could not be opened. Request a new reset email.');
+      }
+    }
+
+    Linking.getInitialURL()
+      .then(url => { void openPasswordRecoveryUrl(url); })
+      .catch((linkError: unknown) => {
+        console.warn('Could not read initial auth link', linkError);
+        Sentry.captureException(linkError);
+      });
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      void openPasswordRecoveryUrl(url);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
     };
   }, []);
 
@@ -141,7 +217,7 @@ export default function AuthScreen() {
   }
 
   async function handleEmail() {
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = getCleanEmail(email);
     const emailError = validateEmail(email);
     if (emailError) { setError(emailError); return; }
     const passwordError = validatePassword(password, mode);
@@ -154,6 +230,8 @@ export default function AuthScreen() {
         : await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (authError) { setError(getAuthErrorMessage(authError.message, mode)); return; }
       if (mode === 'signup' && !data.session) {
+        setPendingEmail(cleanEmail);
+        setMailMessage('');
         setCheckEmail(true);
         return;
       }
@@ -165,33 +243,103 @@ export default function AuthScreen() {
     }
   }
 
-  if (checkEmail) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-        <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: 'center' }}>
-          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 38, letterSpacing: -0.8, color: t.ink, marginBottom: 10 }}>
-            Check your email.
-          </Text>
-          <Text style={{ fontSize: 14, color: t.ink3, marginBottom: 28, lineHeight: 21 }}>
-            Confirm your account, then come back and sign in. You will still appear as Anonymous in Talkd.
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              setCheckEmail(false);
-              setMode('signin');
-              setPassword('');
-              setError('');
-            }}
-            style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: t.amber }}
-            activeOpacity={0.85}
-          >
-            <Text style={{ fontSize: 15, fontWeight: '600', color: t.onAccent, letterSpacing: -0.1 }}>
-              Back to sign in
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
+  async function handleResendConfirmation() {
+    const targetEmail = pendingEmail || getCleanEmail(email);
+    const emailError = validateEmail(targetEmail);
+    if (emailError) {
+      setError(emailError);
+      return;
+    }
+
+    setResending(true);
+    setError('');
+    setMailMessage('');
+    try {
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: targetEmail,
+      });
+      if (resendError) {
+        setError(getAuthErrorMessage(resendError.message, 'signup'));
+        return;
+      }
+      setMailMessage(`We sent another confirmation email from ${AUTH_EMAIL}.`);
+    } catch {
+      setError('Could not resend the confirmation email. Check your connection and try again.');
+    } finally {
+      setResending(false);
+    }
+  }
+
+  async function handlePasswordReset() {
+    const cleanEmail = getCleanEmail(email);
+    const emailError = validateEmail(email);
+    if (emailError) {
+      setError(emailError);
+      return;
+    }
+
+    setResettingPassword(true);
+    setError('');
+    setMailMessage('');
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: PASSWORD_RECOVERY_REDIRECT_URL,
+      });
+      if (resetError) {
+        setError(getAuthErrorMessage(resetError.message, 'signin'));
+        return;
+      }
+      setMailMessage(`Password reset email sent from ${AUTH_EMAIL}.`);
+    } catch {
+      setError('Could not send the password reset email. Check your connection and try again.');
+    } finally {
+      setResettingPassword(false);
+    }
+  }
+
+  async function handleUpdatePassword() {
+    const passwordError = validatePassword(newPassword, 'signup');
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setUpdatingPassword(true);
+    setError('');
+    setMailMessage('');
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) {
+        setError(getAuthErrorMessage(updateError.message, 'signin'));
+        return;
+      }
+
+      setPasswordRecoveryActive(false);
+      setRecoveryMode(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      router.replace('/(tabs)');
+    } catch {
+      setError('Could not update the password. Check your connection and try again.');
+    } finally {
+      setUpdatingPassword(false);
+    }
+  }
+
+  async function handleCancelPasswordRecovery() {
+    setPasswordRecoveryActive(false);
+    setRecoveryMode(false);
+    setNewPassword('');
+    setConfirmPassword('');
+    setPassword('');
+    setMailMessage('');
+    setError('');
+    await supabase.auth.signOut();
   }
 
   const inputStyle = {
@@ -200,13 +348,150 @@ export default function AuthScreen() {
     marginBottom: 10,
   };
 
+  if (checkEmail) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
+        <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: 'center' }}>
+          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 38, letterSpacing: 0, color: t.ink, marginBottom: 10 }}>
+            Check your email.
+          </Text>
+          <Text style={{ fontSize: 14, color: t.ink3, marginBottom: 28, lineHeight: 21 }}>
+            Confirm your account from the email sent by {AUTH_EMAIL}, then come back and sign in. You will still appear as Anonymous in Talkd.
+          </Text>
+          {!!mailMessage && (
+            <Text style={{ fontSize: 12.5, color: t.amber, marginBottom: 12, lineHeight: 18 }}>
+              {mailMessage}
+            </Text>
+          )}
+          {!!error && (
+            <Text style={{ fontSize: 12.5, color: t.red, marginBottom: 12, lineHeight: 18 }}>
+              {error}
+            </Text>
+          )}
+          <TouchableOpacity
+            onPress={() => void handleResendConfirmation()}
+            disabled={resending}
+            style={{
+              paddingVertical: 16,
+              borderRadius: 99,
+              alignItems: 'center',
+              backgroundColor: resending ? t.bg3 : t.amber,
+              marginBottom: 10,
+            }}
+            activeOpacity={0.85}
+          >
+            {resending
+              ? <ActivityIndicator color={t.ink4} />
+              : <Text style={{ fontSize: 15, fontWeight: '600', color: t.onAccent, letterSpacing: 0 }}>
+                  Resend confirmation
+                </Text>
+            }
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setCheckEmail(false);
+              setMode('signin');
+              setPassword('');
+              setError('');
+              setMailMessage('');
+            }}
+            style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: t.bg3 }}
+            activeOpacity={0.85}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '600', color: t.ink, letterSpacing: 0 }}>
+              Back to sign in
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
+            style={{ alignItems: 'center', marginTop: 18 }}
+          >
+            <Text style={{ fontSize: 12.5, color: t.ink3 }}>
+              Need help? Contact {SUPPORT_EMAIL}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (recoveryMode) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: 'center' }}>
+            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 38, letterSpacing: 0, color: t.ink, marginBottom: 10 }}>
+              Reset password.
+            </Text>
+            <Text style={{ fontSize: 14, color: t.ink3, marginBottom: 28, lineHeight: 21 }}>
+              Choose a new password for your Talkd account.
+            </Text>
+            <TextInput
+              value={newPassword}
+              onChangeText={v => { setNewPassword(v); clearError(); }}
+              placeholder="New password"
+              placeholderTextColor={t.ink4}
+              secureTextEntry
+              style={inputStyle}
+            />
+            <TextInput
+              value={confirmPassword}
+              onChangeText={v => { setConfirmPassword(v); clearError(); }}
+              placeholder="Confirm password"
+              placeholderTextColor={t.ink4}
+              secureTextEntry
+              style={inputStyle}
+            />
+            {!!error && (
+              <Text style={{ fontSize: 12.5, color: t.red, marginBottom: 12, lineHeight: 18 }}>
+                {error}
+              </Text>
+            )}
+            {!!mailMessage && (
+              <Text style={{ fontSize: 12.5, color: t.amber, marginBottom: 12, lineHeight: 18 }}>
+                {mailMessage}
+              </Text>
+            )}
+            <TouchableOpacity
+              onPress={() => void handleUpdatePassword()}
+              disabled={updatingPassword}
+              style={{
+                paddingVertical: 16,
+                borderRadius: 99,
+                alignItems: 'center',
+                backgroundColor: updatingPassword ? t.bg3 : t.amber,
+                marginTop: 4,
+              }}
+              activeOpacity={0.85}
+            >
+              {updatingPassword
+                ? <ActivityIndicator color={t.ink4} />
+                : <Text style={{ fontSize: 15, fontWeight: '600', color: t.onAccent, letterSpacing: 0 }}>
+                    Update password
+                  </Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => void handleCancelPasswordRecovery()}
+              style={{ alignItems: 'center', marginTop: 18 }}
+            >
+              <Text style={{ fontSize: 13, color: t.ink3 }}>
+                Back to sign in
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={{ flex: 1, paddingHorizontal: 28, justifyContent: 'center' }}>
 
           {/* Heading */}
-          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 38, letterSpacing: -0.8, color: t.ink, marginBottom: 8 }}>
+          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 38, letterSpacing: 0, color: t.ink, marginBottom: 8 }}>
             {mode === 'signin' ? 'Welcome back.' : 'Join talkd.'}
           </Text>
           <Text style={{ fontSize: 14, color: t.ink3, marginBottom: 40, lineHeight: 20 }}>
@@ -259,6 +544,9 @@ export default function AuthScreen() {
           {error ? (
             <Text style={{ fontSize: 12.5, color: t.red, marginBottom: 12, lineHeight: 18 }}>{error}</Text>
           ) : null}
+          {mailMessage ? (
+            <Text style={{ fontSize: 12.5, color: t.amber, marginBottom: 12, lineHeight: 18 }}>{mailMessage}</Text>
+          ) : null}
 
           {/* CTA */}
           <TouchableOpacity
@@ -269,15 +557,27 @@ export default function AuthScreen() {
           >
             {loading
               ? <ActivityIndicator color={t.bg} />
-              : <Text style={{ fontSize: 15, fontWeight: '600', color: t.onAccent, letterSpacing: -0.1 }}>
+              : <Text style={{ fontSize: 15, fontWeight: '600', color: t.onAccent, letterSpacing: 0 }}>
                   {mode === 'signin' ? 'Sign in' : 'Create account'}
                 </Text>
             }
           </TouchableOpacity>
 
+          {mode === 'signin' && (
+            <TouchableOpacity
+              onPress={() => void handlePasswordReset()}
+              disabled={resettingPassword}
+              style={{ alignItems: 'center', marginTop: 14 }}
+            >
+              <Text style={{ fontSize: 13, color: t.ink3 }}>
+                {resettingPassword ? 'Sending reset email...' : 'Forgot password?'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {/* Mode toggle */}
           <TouchableOpacity
-            onPress={() => { setMode(m => m === 'signin' ? 'signup' : 'signin'); setError(''); }}
+            onPress={() => { setMode(m => m === 'signin' ? 'signup' : 'signin'); setError(''); setMailMessage(''); }}
             style={{ alignItems: 'center', marginTop: 20 }}
           >
             <Text style={{ fontSize: 13, color: t.ink3 }}>

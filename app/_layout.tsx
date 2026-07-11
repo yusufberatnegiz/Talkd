@@ -2,10 +2,11 @@ import { Sentry, initSentry } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import { ensureOwnProfile } from '@/lib/profile';
 import { hasAcceptedSafetyGuidelines, subscribeSafetyAcceptance } from '@/lib/safetyAcceptance';
+import { markPasswordRecoveryUrl, setPasswordRecoveryActive, subscribePasswordRecoveryActive } from '@/lib/passwordRecovery';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Linking, View } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 
 initSentry();
@@ -15,6 +16,7 @@ function RootLayout() {
   const segments = useSegments();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [safetyAccepted, setSafetyAccepted] = useState<boolean | undefined>(undefined);
+  const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession()
@@ -24,12 +26,26 @@ function RootLayout() {
         Sentry.captureException(error);
         setSession(null);
       });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecoveryActive(true);
+      if (event === 'SIGNED_OUT') setPasswordRecoveryActive(false);
       setSession(s);
     });
     const unsubscribeSafetyAcceptance = subscribeSafetyAcceptance(setSafetyAccepted);
+    const unsubscribePasswordRecovery = subscribePasswordRecoveryActive(setPasswordRecoveryOpen);
+    Linking.getInitialURL()
+      .then(markPasswordRecoveryUrl)
+      .catch((error: unknown) => {
+        console.warn('Could not read initial auth link', error);
+        Sentry.captureException(error);
+      });
+    const linkingSubscription = Linking.addEventListener('url', ({ url }) => {
+      markPasswordRecoveryUrl(url);
+    });
     return () => {
       unsubscribeSafetyAcceptance();
+      unsubscribePasswordRecovery();
+      linkingSubscription.remove();
       subscription.unsubscribe();
     };
   }, []);
@@ -74,10 +90,10 @@ function RootLayout() {
       router.replace('/onboarding');
     } else if (session && !safetyAccepted && !inOnboarding) {
       router.replace('/onboarding');
-    } else if (session && safetyAccepted && inAuthGroup) {
+    } else if (session && safetyAccepted && inAuthGroup && !passwordRecoveryOpen) {
       router.replace('/(tabs)');
     }
-  }, [session, safetyAccepted, segments]);
+  }, [session, safetyAccepted, segments, passwordRecoveryOpen]);
 
   // Avoid rendering screens before session is known
   if (session === undefined) {

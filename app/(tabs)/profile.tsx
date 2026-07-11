@@ -90,7 +90,7 @@ export default function ProfileScreen() {
     {
       section: 'Support',
       items: [
-        { icon: HelpCircle, label: 'Help center', onPress: () => Linking.openURL('mailto:support@talkd.app') },
+        { icon: HelpCircle, label: 'Help center', onPress: () => Linking.openURL('mailto:support@talkd.mobile') },
         { icon: Headphones, label: 'Go on duty', onPress: () => router.push('/listener' as never) },
       ],
     },

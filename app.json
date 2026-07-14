@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.talkd.app",
+      "bundleIdentifier": "com.yusufberatnegiz.talkd",
       "usesAppleSignIn": true
     },
     "plugins": [

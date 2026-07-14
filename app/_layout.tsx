@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { ensureOwnProfile } from '@/lib/profile';
 import { hasAcceptedSafetyGuidelines, subscribeSafetyAcceptance } from '@/lib/safetyAcceptance';
 import { markPasswordRecoveryUrl, setPasswordRecoveryActive, subscribePasswordRecoveryActive } from '@/lib/passwordRecovery';
+import { configureRevenueCat } from '@/lib/revenueCat';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -29,6 +30,7 @@ function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       if (event === 'PASSWORD_RECOVERY') setPasswordRecoveryActive(true);
       if (event === 'SIGNED_OUT') setPasswordRecoveryActive(false);
+      void configureRevenueCat(s?.user.id ?? null);
       setSession(s);
     });
     const unsubscribeSafetyAcceptance = subscribeSafetyAcceptance(setSafetyAccepted);
@@ -73,6 +75,7 @@ function RootLayout() {
     }
 
     void loadSafetyAcceptance();
+    void configureRevenueCat(session?.user.id ?? null);
 
     return () => {
       isCancelled = true;
@@ -112,6 +115,7 @@ function RootLayout() {
         <Stack.Screen name="chat" />
         <Stack.Screen name="listener" />
         <Stack.Screen name="privacy" />
+        <Stack.Screen name="premium" />
         <Stack.Screen name="rating" />
       </Stack>
     </>

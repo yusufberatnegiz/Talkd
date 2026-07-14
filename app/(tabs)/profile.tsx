@@ -1,10 +1,11 @@
 import { BottomNav } from '@/components/BottomNav';
 import { supabase } from '@/lib/supabase';
 import { type AppearanceChoice, APPEARANCE_LABEL, setAppearance, useAppearance, useTheme } from '@/hooks/useTheme';
+import { useRevenueCat } from '@/hooks/useRevenueCat';
 import { useUserStats } from '@/hooks/useUserStats';
 import { useRouter } from 'expo-router';
 import {
-  Bell, ChevronRight, Headphones, HelpCircle,
+  Bell, ChevronRight, Crown, Headphones, HelpCircle,
   LogOut, Moon, Shield,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -77,11 +78,18 @@ export default function ProfileScreen() {
   const { preference: appearance } = useAppearance();
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [signOutError, setSignOutError] = useState('');
+  const { isPro, loading: premiumLoading } = useRevenueCat();
 
   const MENU: MenuSection[] = [
     {
       section: 'Preferences',
       items: [
+        {
+          icon: Crown,
+          label: 'Talkd Pro',
+          value: premiumLoading ? 'Checking' : isPro ? 'Active' : 'Upgrade',
+          onPress: () => router.push('/premium' as never),
+        },
         { icon: Bell, label: 'Notifications', value: 'Device settings', onPress: () => Linking.openSettings() },
         { icon: Moon, label: 'Appearance', value: APPEARANCE_LABEL[appearance], onPress: () => setAppearanceOpen(true) },
         { icon: Shield, label: 'Privacy & data', onPress: () => router.push('/privacy' as never) },

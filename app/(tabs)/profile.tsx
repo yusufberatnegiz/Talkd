@@ -78,7 +78,7 @@ export default function ProfileScreen() {
   const { preference: appearance } = useAppearance();
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [signOutError, setSignOutError] = useState('');
-  const { isPro, loading: premiumLoading } = useRevenueCat();
+  const { isPremium, loading: premiumLoading } = useRevenueCat();
 
   const MENU: MenuSection[] = [
     {
@@ -86,8 +86,8 @@ export default function ProfileScreen() {
       items: [
         {
           icon: Crown,
-          label: 'Talkd Pro',
-          value: premiumLoading ? 'Checking' : isPro ? 'Active' : 'Upgrade',
+          label: 'Talkd Premium',
+          value: premiumLoading ? 'Checking' : isPremium ? 'Active' : 'Upgrade',
           onPress: () => router.push('/premium' as never),
         },
         { icon: Bell, label: 'Notifications', value: 'Device settings', onPress: () => Linking.openSettings() },

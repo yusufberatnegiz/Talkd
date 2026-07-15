@@ -10,7 +10,7 @@ import { Sentry } from '@/lib/sentry';
 
 export const REVENUECAT_API_KEY =
   process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? 'test_HnnUJcqBNpWrlvcZqoofkikVEeF';
-export const REVENUECAT_ENTITLEMENT_ID = 'Talkd Pro';
+export const REVENUECAT_ENTITLEMENT_ID = 'Talkd Premium';
 export const REVENUECAT_OFFERING_ID = 'default';
 
 export const REVENUECAT_PRODUCTS = {
@@ -24,7 +24,7 @@ export type RevenueCatPlan = keyof typeof REVENUECAT_PRODUCTS;
 export interface RevenueCatState {
   customerInfo: CustomerInfo | null;
   currentOffering: PurchasesOffering | null;
-  isPro: boolean;
+  isPremium: boolean;
 }
 
 let isConfigured = false;
@@ -34,7 +34,7 @@ export function isRevenueCatSupported(): boolean {
   return Platform.OS === 'ios';
 }
 
-export function isTalkdPro(customerInfo: CustomerInfo | null): boolean {
+export function isTalkdPremium(customerInfo: CustomerInfo | null): boolean {
   return customerInfo?.entitlements.active[REVENUECAT_ENTITLEMENT_ID]?.isActive === true;
 }
 
@@ -78,7 +78,7 @@ export async function getRevenueCatState(): Promise<RevenueCatState> {
   return {
     customerInfo,
     currentOffering: offerings.current ?? offerings.all[REVENUECAT_OFFERING_ID] ?? null,
-    isPro: isTalkdPro(customerInfo),
+    isPremium: isTalkdPremium(customerInfo),
   };
 }
 
@@ -115,7 +115,7 @@ export async function restoreRevenueCatPurchases(): Promise<CustomerInfo> {
   return Purchases.restorePurchases();
 }
 
-export async function presentTalkdProPaywall(
+export async function presentTalkdPremiumPaywall(
   offering?: PurchasesOffering | null
 ): Promise<PAYWALL_RESULT> {
   return RevenueCatUI.presentPaywallIfNeeded({

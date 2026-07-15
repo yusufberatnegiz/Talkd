@@ -14,9 +14,9 @@ import {
   getRevenueCatErrorMessage,
   getRevenueCatState,
   isRevenueCatSupported,
-  isTalkdPro,
+  isTalkdPremium,
   presentRevenueCatCustomerCenter,
-  presentTalkdProPaywall,
+  presentTalkdPremiumPaywall,
   purchaseRevenueCatPackage,
   restoreRevenueCatPurchases,
   type RevenueCatPlan,
@@ -28,7 +28,7 @@ interface UseRevenueCatResult {
   loading: boolean;
   actionLoading: boolean;
   isConfigured: boolean;
-  isPro: boolean;
+  isPremium: boolean;
   error: string;
   refresh: () => Promise<void>;
   presentPaywall: () => Promise<boolean>;
@@ -101,7 +101,7 @@ export function useRevenueCat(): UseRevenueCatResult {
     try {
       const nextCustomerInfo = await action();
       if (nextCustomerInfo) setCustomerInfo(nextCustomerInfo);
-      return nextCustomerInfo ? isTalkdPro(nextCustomerInfo) : false;
+      return nextCustomerInfo ? isTalkdPremium(nextCustomerInfo) : false;
     } catch (purchaseError: unknown) {
       console.warn('RevenueCat purchase action failed', purchaseError);
       Sentry.captureException(purchaseError);
@@ -116,7 +116,7 @@ export function useRevenueCat(): UseRevenueCatResult {
     setActionLoading(true);
     setError('');
     try {
-      const paywallResult = await presentTalkdProPaywall(currentOffering);
+      const paywallResult = await presentTalkdPremiumPaywall(currentOffering);
       await refresh();
       return paywallResult === 'PURCHASED' || paywallResult === 'RESTORED';
     } catch (paywallError: unknown) {
@@ -132,7 +132,7 @@ export function useRevenueCat(): UseRevenueCatResult {
   const purchasePlan = useCallback(async (plan: RevenueCatPlan): Promise<boolean> => {
     const planPackage = getPackageForPlan(currentOffering, plan);
     if (!planPackage) {
-      setError('This Talkd Pro option is not available yet. Check the RevenueCat offering setup.');
+      setError('This Talkd Premium option is not available yet. Check the RevenueCat offering setup.');
       return false;
     }
     return runPurchaseAction(() => purchaseRevenueCatPackage(planPackage));
@@ -172,7 +172,7 @@ export function useRevenueCat(): UseRevenueCatResult {
     loading,
     actionLoading,
     isConfigured,
-    isPro: isTalkdPro(customerInfo),
+    isPremium: isTalkdPremium(customerInfo),
     error,
     refresh,
     presentPaywall,

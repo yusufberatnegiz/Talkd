@@ -8,7 +8,7 @@ The app expects these identifiers:
 
 ```txt
 RevenueCat API key: test_HnnUJcqBNpWrlvcZqoofkikVEeF
-Entitlement ID: Talkd Pro
+Entitlement ID: Talkd Premium
 Offering ID: default
 Products/packages: monthly, yearly, lifetime
 ```
@@ -40,10 +40,10 @@ lifetime
 5. Create entitlement:
 
 ```txt
-Talkd Pro
+Talkd Premium
 ```
 
-6. Attach all three products to `Talkd Pro`.
+6. Attach all three products to `Talkd Premium`.
 7. Create offering:
 
 ```txt
@@ -71,7 +71,7 @@ yearly: auto-renewable yearly subscription
 lifetime: non-consumable lifetime purchase
 ```
 
-All products should unlock the same RevenueCat entitlement: `Talkd Pro`.
+All products should unlock the same RevenueCat entitlement: `Talkd Premium`.
 
 ## Testing
 
@@ -81,9 +81,9 @@ Test flow:
 
 1. Sign in to Talkd.
 2. Open Profile.
-3. Tap Talkd Pro.
+3. Tap Talkd Premium.
 4. Open the RevenueCat paywall.
 5. Purchase with a sandbox Apple account.
-6. Confirm Profile shows Talkd Pro as Active.
+6. Confirm Profile shows Talkd Premium as Active.
 7. Test Restore.
 8. Test Manage through RevenueCat Customer Center.

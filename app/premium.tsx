@@ -7,7 +7,7 @@ import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const PLANS: { key: RevenueCatPlan; title: string; detail: string }[] = [
-  { key: 'monthly', title: 'Monthly', detail: 'Flexible access to Talkd Pro.' },
+  { key: 'monthly', title: 'Monthly', detail: 'Flexible access to Talkd Premium.' },
   { key: 'yearly', title: 'Yearly', detail: 'Best for regular listeners and talkers.' },
   { key: 'lifetime', title: 'Lifetime', detail: 'One purchase for lasting access.' },
 ];
@@ -19,7 +19,7 @@ export default function PremiumScreen() {
     loading,
     actionLoading,
     isConfigured,
-    isPro,
+    isPremium,
     error,
     getPlanPackage,
     presentPaywall,
@@ -68,25 +68,25 @@ export default function PremiumScreen() {
             <Crown size={25} color={t.amber} strokeWidth={2.2} />
           </View>
           <Text style={{ fontFamily: 'Georgia', fontSize: 40, lineHeight: 44, letterSpacing: 0, color: t.ink }}>
-            Talkd Pro
+            Talkd Premium
           </Text>
           <Text style={{ marginTop: 10, fontSize: 14, lineHeight: 21, color: t.ink3 }}>
-            Support Talkd and unlock Pro access tied to your private account.
+            Support Talkd and unlock Premium access tied to your private account.
           </Text>
         </View>
 
         <View style={{
           borderRadius: 12,
-          backgroundColor: isPro ? t.amberSoft : t.bg3,
+          backgroundColor: isPremium ? t.amberSoft : t.bg3,
           borderWidth: 0.5,
-          borderColor: isPro ? t.amber + '55' : t.line,
+          borderColor: isPremium ? t.amber + '55' : t.line,
           padding: 16,
           marginBottom: 18,
         }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <BadgeCheck size={19} color={isPro ? t.amber : t.ink3} strokeWidth={2.2} />
+            <BadgeCheck size={19} color={isPremium ? t.amber : t.ink3} strokeWidth={2.2} />
             <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: t.ink }}>
-              {isPro ? 'Talkd Pro is active' : 'Talkd Pro is not active'}
+              {isPremium ? 'Talkd Premium is active' : 'Talkd Premium is not active'}
             </Text>
           </View>
           <Text style={{ marginTop: 8, fontSize: 12.5, lineHeight: 18, color: t.ink3 }}>
@@ -116,7 +116,7 @@ export default function PremiumScreen() {
                 <ActivityIndicator color={t.ink4} />
               ) : (
                 <Text style={{ fontSize: 15, fontWeight: '700', color: isConfigured ? t.onAccent : t.ink4, letterSpacing: 0 }}>
-                  {isPro ? 'View Pro options' : 'Open Pro paywall'}
+                  {isPremium ? 'View Premium options' : 'Open Premium paywall'}
                 </Text>
               )}
             </TouchableOpacity>

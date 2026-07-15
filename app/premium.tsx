@@ -7,10 +7,26 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const PLANS: { key: RevenueCatPlan; title: string; detail: string }[] = [
-  { key: 'monthly', title: 'Monthly', detail: 'Flexible access to Talkd Premium.' },
-  { key: 'yearly', title: 'Yearly', detail: 'Best for regular listeners and talkers.' },
-  { key: 'lifetime', title: 'Lifetime', detail: 'One purchase for lasting access.' },
+const PLANS: {
+  key: RevenueCatPlan;
+  title: string;
+  detail: string;
+  compareAtPrice: string;
+  badge?: string;
+}[] = [
+  {
+    key: 'monthly',
+    title: 'Monthly',
+    detail: 'Flexible access to Talkd Premium.',
+    compareAtPrice: '$5.99',
+  },
+  {
+    key: 'yearly',
+    title: 'Yearly',
+    detail: 'Best value for regular listeners and talkers.',
+    compareAtPrice: '$35.99',
+    badge: 'Best value',
+  },
 ];
 
 export default function PremiumScreen() {
@@ -154,15 +170,45 @@ export default function PremiumScreen() {
                     activeOpacity={0.78}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: t.ink }}>
-                        {plan.title}
-                      </Text>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: t.amber }}>
-                        {price}
-                      </Text>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <Text style={{ fontSize: 15, fontWeight: '700', color: t.ink }}>
+                            {plan.title}
+                          </Text>
+                          {!!plan.badge && (
+                            <View style={{
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 99,
+                              backgroundColor: t.amberSoft,
+                              borderWidth: 0.5,
+                              borderColor: t.amber + '55',
+                            }}>
+                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: t.amber }}>
+                                {plan.badge}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ marginTop: 5, fontSize: 12.5, lineHeight: 18, color: t.ink3 }}>
+                          {plan.detail}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{
+                          fontSize: 12,
+                          color: t.ink4,
+                          textDecorationLine: 'line-through',
+                        }}>
+                          {plan.compareAtPrice}
+                        </Text>
+                        <Text style={{ marginTop: 2, fontSize: 16, fontWeight: '700', color: t.amber }}>
+                          {price}
+                        </Text>
+                      </View>
                     </View>
-                    <Text style={{ marginTop: 5, fontSize: 12.5, lineHeight: 18, color: t.ink3 }}>
-                      {plan.detail}
+                    <Text style={{ marginTop: 8, fontSize: 11.5, lineHeight: 16, color: t.ink4 }}>
+                      Launch price, limited time.
                     </Text>
                   </TouchableOpacity>
                 );

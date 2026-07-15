@@ -20,15 +20,21 @@ talkd_premium_yearly: $14.99, shown as on sale from $35.99
 
 ## Current App State
 
-The Talkd Premium screen is provider-free and shows the launch pricing, but Apple purchasing is intentionally disabled until direct StoreKit support is added.
+The Talkd Premium screen uses `expo-iap` for direct Apple StoreKit purchases.
 
-Next implementation step:
+Implemented:
 
-1. Add a direct React Native Apple in-app purchase SDK that supports Expo development builds.
-2. Fetch products from App Store Connect by the product identifiers above.
-3. Purchase the selected product through Apple's native purchase sheet.
+1. Fetch products from App Store Connect by the product identifiers above.
+2. Purchase the selected product through Apple's native purchase sheet.
+3. Finish successful StoreKit transactions.
 4. Restore purchases through Apple's restore flow.
-5. Verify receipts server-side before granting premium access.
-6. Store only premium access metadata in Supabase.
+5. Open Apple subscription management.
+
+Release TODO:
+
+1. Verify Apple transactions server-side before trusting premium access.
+2. Store only premium access metadata in Supabase.
+3. Re-check premium access from Supabase on app launch after server verification exists.
+4. Test purchases in an iOS development build or TestFlight with a sandbox Apple account.
 
 Do not store chat messages while implementing premium access.

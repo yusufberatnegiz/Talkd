@@ -16,11 +16,14 @@ export default function PremiumScreen() {
     isPurchaseAvailable,
     isPremium,
     error,
+    getPlanProduct,
     purchasePlan,
     restorePurchases,
     openManageSubscriptions,
   } = usePremium();
   const [selectedPlan, setSelectedPlan] = useState<PremiumPlan>('monthly');
+  const selectedProduct = getPlanProduct(selectedPlan);
+  const canPurchaseSelectedPlan = isPurchaseAvailable && !!selectedProduct;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
@@ -124,6 +127,8 @@ export default function PremiumScreen() {
             <View style={{ gap: 10, marginTop: 6 }}>
               {PREMIUM_PLANS.map(plan => {
                 const selected = selectedPlan === plan.key;
+                const product = getPlanProduct(plan.key);
+                const price = product?.displayPrice ?? plan.price;
                 return (
                   <TouchableOpacity
                     key={plan.key}
@@ -172,7 +177,7 @@ export default function PremiumScreen() {
                           {plan.compareAtPrice}
                         </Text>
                         <Text style={{ marginTop: 2, fontSize: 16, fontWeight: '700', color: t.amber }}>
-                          {plan.price}
+                          {price}
                         </Text>
                       </View>
                     </View>
@@ -186,12 +191,12 @@ export default function PremiumScreen() {
 
             <TouchableOpacity
               onPress={() => void purchasePlan(selectedPlan)}
-              disabled={actionLoading || !isPurchaseAvailable}
+              disabled={actionLoading || !canPurchaseSelectedPlan}
               style={{
                 paddingVertical: 16,
                 borderRadius: 99,
                 alignItems: 'center',
-                backgroundColor: actionLoading || !isPurchaseAvailable ? t.bg3 : t.amber,
+                backgroundColor: actionLoading || !canPurchaseSelectedPlan ? t.bg3 : t.amber,
                 marginTop: 16,
               }}
               activeOpacity={0.85}
@@ -202,21 +207,21 @@ export default function PremiumScreen() {
                 <Text style={{
                   fontSize: 15,
                   fontWeight: '700',
-                  color: isPurchaseAvailable ? t.onAccent : t.ink4,
+                  color: canPurchaseSelectedPlan ? t.onAccent : t.ink4,
                   letterSpacing: 0,
                 }}>
-                  Apple Subscriptions Not Connected
+                  {canPurchaseSelectedPlan ? 'Continue' : 'Loading Apple Subscriptions'}
                 </Text>
               )}
             </TouchableOpacity>
 
             <Text style={{ marginTop: 10, textAlign: 'center', fontSize: 12, lineHeight: 17, color: t.ink4 }}>
-              Apple will confirm before you subscribe after direct in-app purchases are connected.
+              Apple will confirm before you subscribe.
             </Text>
 
             {!isPurchaseAvailable && (
               <Text style={{ marginTop: 14, fontSize: 12.5, lineHeight: 18, color: t.red }}>
-                Direct Apple subscriptions are not implemented yet.
+                Apple subscription products are not loaded yet. This requires an iOS development build or TestFlight.
               </Text>
             )}
 

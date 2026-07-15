@@ -1,7 +1,7 @@
 import { BottomNav } from '@/components/BottomNav';
 import { supabase } from '@/lib/supabase';
 import { type AppearanceChoice, APPEARANCE_LABEL, setAppearance, useAppearance, useTheme } from '@/hooks/useTheme';
-import { useRevenueCat } from '@/hooks/useRevenueCat';
+import { usePremium } from '@/hooks/usePremium';
 import { useUserStats } from '@/hooks/useUserStats';
 import { useRouter } from 'expo-router';
 import {
@@ -78,7 +78,7 @@ export default function ProfileScreen() {
   const { preference: appearance } = useAppearance();
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [signOutError, setSignOutError] = useState('');
-  const { isPremium, loading: premiumLoading } = useRevenueCat();
+  const { isPremium, loading: premiumLoading, isPurchaseAvailable } = usePremium();
 
   const MENU: MenuSection[] = [
     {
@@ -87,7 +87,7 @@ export default function ProfileScreen() {
         {
           icon: Crown,
           label: 'Talkd Premium',
-          value: premiumLoading ? 'Checking' : isPremium ? 'Active' : 'Upgrade',
+          value: premiumLoading ? 'Checking' : isPremium ? 'Active' : isPurchaseAvailable ? 'Upgrade' : 'Setup needed',
           onPress: () => router.push('/premium' as never),
         },
         { icon: Bell, label: 'Notifications', value: 'Device settings', onPress: () => Linking.openSettings() },

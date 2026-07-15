@@ -1,33 +1,11 @@
-import { useRevenueCat } from '@/hooks/useRevenueCat';
+import { usePremium } from '@/hooks/usePremium';
 import { useTheme } from '@/hooks/useTheme';
-import { REVENUECAT_ENTITLEMENT_ID, type RevenueCatPlan } from '@/lib/revenueCat';
+import { PREMIUM_ENTITLEMENT_LABEL, PREMIUM_PLANS, type PremiumPlan } from '@/lib/premium';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, BadgeCheck, Crown, RefreshCw, ShieldCheck } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-const PLANS: {
-  key: RevenueCatPlan;
-  title: string;
-  detail: string;
-  compareAtPrice: string;
-  badge?: string;
-}[] = [
-  {
-    key: 'monthly',
-    title: 'Monthly',
-    detail: 'Flexible access to Talkd Premium.',
-    compareAtPrice: '$5.99',
-  },
-  {
-    key: 'yearly',
-    title: 'Yearly',
-    detail: 'Best value for regular listeners and talkers.',
-    compareAtPrice: '$35.99',
-    badge: 'Best value',
-  },
-];
 
 export default function PremiumScreen() {
   const t = useTheme();
@@ -35,22 +13,14 @@ export default function PremiumScreen() {
   const {
     loading,
     actionLoading,
-    isConfigured,
+    isPurchaseAvailable,
     isPremium,
     error,
-    getPlanPackage,
     purchasePlan,
     restorePurchases,
-    openCustomerCenter,
-  } = useRevenueCat();
-  const availablePlans = useMemo(() => {
-    return PLANS
-      .map(plan => ({ ...plan, package: getPlanPackage(plan.key) }))
-      .filter(plan => !!plan.package);
-  }, [getPlanPackage]);
-  const fallbackPlan = availablePlans[0]?.key ?? 'monthly';
-  const [selectedPlan, setSelectedPlan] = useState<RevenueCatPlan>('monthly');
-  const selectedAvailablePlan = availablePlans.find(plan => plan.key === selectedPlan) ?? availablePlans[0] ?? null;
+    openManageSubscriptions,
+  } = usePremium();
+  const [selectedPlan, setSelectedPlan] = useState<PremiumPlan>('monthly');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
@@ -141,7 +111,7 @@ export default function PremiumScreen() {
             </Text>
           </View>
           <Text style={{ marginTop: 8, fontSize: 12.5, lineHeight: 18, color: t.ink3 }}>
-            Entitlement checked: {REVENUECAT_ENTITLEMENT_ID}
+            Access label: {PREMIUM_ENTITLEMENT_LABEL}
           </Text>
         </View>
 
@@ -152,9 +122,8 @@ export default function PremiumScreen() {
         ) : (
           <>
             <View style={{ gap: 10, marginTop: 6 }}>
-              {availablePlans.map(plan => {
-                const price = plan.package?.product.priceString ?? '';
-                const selected = selectedAvailablePlan?.key === plan.key;
+              {PREMIUM_PLANS.map(plan => {
+                const selected = selectedPlan === plan.key;
                 return (
                   <TouchableOpacity
                     key={plan.key}
@@ -203,7 +172,7 @@ export default function PremiumScreen() {
                           {plan.compareAtPrice}
                         </Text>
                         <Text style={{ marginTop: 2, fontSize: 16, fontWeight: '700', color: t.amber }}>
-                          {price}
+                          {plan.price}
                         </Text>
                       </View>
                     </View>
@@ -215,28 +184,14 @@ export default function PremiumScreen() {
               })}
             </View>
 
-            {!availablePlans.length && (
-              <View style={{
-                borderRadius: 12,
-                backgroundColor: t.bg3,
-                borderWidth: 0.5,
-                borderColor: t.line,
-                padding: 16,
-              }}>
-                <Text style={{ fontSize: 14, lineHeight: 20, color: t.ink3 }}>
-                  No purchase options are available yet. Check the RevenueCat offering setup for the current app.
-                </Text>
-              </View>
-            )}
-
             <TouchableOpacity
-              onPress={() => void purchasePlan(selectedAvailablePlan?.key ?? fallbackPlan)}
-              disabled={actionLoading || !isConfigured || !selectedAvailablePlan}
+              onPress={() => void purchasePlan(selectedPlan)}
+              disabled={actionLoading || !isPurchaseAvailable}
               style={{
                 paddingVertical: 16,
                 borderRadius: 99,
                 alignItems: 'center',
-                backgroundColor: actionLoading || !isConfigured || !selectedAvailablePlan ? t.bg3 : t.amber,
+                backgroundColor: actionLoading || !isPurchaseAvailable ? t.bg3 : t.amber,
                 marginTop: 16,
               }}
               activeOpacity={0.85}
@@ -247,21 +202,21 @@ export default function PremiumScreen() {
                 <Text style={{
                   fontSize: 15,
                   fontWeight: '700',
-                  color: isConfigured && selectedAvailablePlan ? t.onAccent : t.ink4,
+                  color: isPurchaseAvailable ? t.onAccent : t.ink4,
                   letterSpacing: 0,
                 }}>
-                  Continue
+                  Apple Subscriptions Not Connected
                 </Text>
               )}
             </TouchableOpacity>
 
             <Text style={{ marginTop: 10, textAlign: 'center', fontSize: 12, lineHeight: 17, color: t.ink4 }}>
-              Apple will confirm before you subscribe.
+              Apple will confirm before you subscribe after direct in-app purchases are connected.
             </Text>
 
-            {!isConfigured && (
+            {!isPurchaseAvailable && (
               <Text style={{ marginTop: 14, fontSize: 12.5, lineHeight: 18, color: t.red }}>
-                RevenueCat is available in the iOS development build or TestFlight. Expo Go only previews purchase UI behavior.
+                Direct Apple subscriptions are not implemented yet.
               </Text>
             )}
 
@@ -274,7 +229,7 @@ export default function PremiumScreen() {
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
               <TouchableOpacity
                 onPress={() => void restorePurchases()}
-                disabled={actionLoading || !isConfigured}
+                disabled={actionLoading}
                 style={{
                   flex: 1,
                   paddingVertical: 14,
@@ -294,8 +249,8 @@ export default function PremiumScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => void openCustomerCenter()}
-                disabled={actionLoading || !isConfigured}
+                onPress={() => void openManageSubscriptions()}
+                disabled={actionLoading}
                 style={{
                   flex: 1,
                   paddingVertical: 14,

@@ -16,7 +16,6 @@ import {
   isRevenueCatSupported,
   isTalkdPremium,
   presentRevenueCatCustomerCenter,
-  presentTalkdPremiumPaywall,
   purchaseRevenueCatPackage,
   restoreRevenueCatPurchases,
   type RevenueCatPlan,
@@ -31,7 +30,6 @@ interface UseRevenueCatResult {
   isPremium: boolean;
   error: string;
   refresh: () => Promise<void>;
-  presentPaywall: () => Promise<boolean>;
   purchasePlan: (plan: RevenueCatPlan) => Promise<boolean>;
   restorePurchases: () => Promise<boolean>;
   openCustomerCenter: () => Promise<void>;
@@ -112,23 +110,6 @@ export function useRevenueCat(): UseRevenueCatResult {
     }
   }, []);
 
-  const presentPaywall = useCallback(async (): Promise<boolean> => {
-    setActionLoading(true);
-    setError('');
-    try {
-      const paywallResult = await presentTalkdPremiumPaywall(currentOffering);
-      await refresh();
-      return paywallResult === 'PURCHASED' || paywallResult === 'RESTORED';
-    } catch (paywallError: unknown) {
-      console.warn('RevenueCat paywall failed', paywallError);
-      Sentry.captureException(paywallError);
-      setError(getRevenueCatErrorMessage(paywallError));
-      return false;
-    } finally {
-      setActionLoading(false);
-    }
-  }, [currentOffering, refresh]);
-
   const purchasePlan = useCallback(async (plan: RevenueCatPlan): Promise<boolean> => {
     const planPackage = getPackageForPlan(currentOffering, plan);
     if (!planPackage) {
@@ -175,7 +156,6 @@ export function useRevenueCat(): UseRevenueCatResult {
     isPremium: isTalkdPremium(customerInfo),
     error,
     refresh,
-    presentPaywall,
     purchasePlan,
     restorePurchases,
     openCustomerCenter,

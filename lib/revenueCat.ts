@@ -4,7 +4,7 @@ import Purchases, {
   type PurchasesOffering,
   type PurchasesPackage,
 } from 'react-native-purchases';
-import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
+import RevenueCatUI from 'react-native-purchases-ui';
 import { Platform } from 'react-native';
 import { Sentry } from '@/lib/sentry';
 
@@ -113,16 +113,6 @@ export async function purchaseRevenueCatPackage(
 
 export async function restoreRevenueCatPurchases(): Promise<CustomerInfo> {
   return Purchases.restorePurchases();
-}
-
-export async function presentTalkdPremiumPaywall(
-  offering?: PurchasesOffering | null
-): Promise<PAYWALL_RESULT> {
-  return RevenueCatUI.presentPaywallIfNeeded({
-    requiredEntitlementIdentifier: REVENUECAT_ENTITLEMENT_ID,
-    offering: offering ?? undefined,
-    displayCloseButton: true,
-  });
 }
 
 export async function presentRevenueCatCustomerCenter(): Promise<void> {

@@ -3,6 +3,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { REVENUECAT_ENTITLEMENT_ID, type RevenueCatPlan } from '@/lib/revenueCat';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, BadgeCheck, Crown, RefreshCw, ShieldCheck } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,11 +23,18 @@ export default function PremiumScreen() {
     isPremium,
     error,
     getPlanPackage,
-    presentPaywall,
     purchasePlan,
     restorePurchases,
     openCustomerCenter,
   } = useRevenueCat();
+  const availablePlans = useMemo(() => {
+    return PLANS
+      .map(plan => ({ ...plan, package: getPlanPackage(plan.key) }))
+      .filter(plan => !!plan.package);
+  }, [getPlanPackage]);
+  const fallbackPlan = availablePlans[0]?.key ?? 'monthly';
+  const [selectedPlan, setSelectedPlan] = useState<RevenueCatPlan>('monthly');
+  const selectedAvailablePlan = availablePlans.find(plan => plan.key === selectedPlan) ?? availablePlans[0] ?? null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
@@ -71,8 +79,35 @@ export default function PremiumScreen() {
             Talkd Premium
           </Text>
           <Text style={{ marginTop: 10, fontSize: 14, lineHeight: 21, color: t.ink3 }}>
-            Support Talkd and unlock Premium access tied to your private account.
+            Support safer anonymous conversations and keep Premium access tied to your private account.
           </Text>
+        </View>
+
+        <View style={{ gap: 10, marginBottom: 18 }}>
+          {[
+            'Private premium access on this account',
+            'Restore purchases anytime',
+            'Helps keep Talkd moderated and reliable',
+          ].map(benefit => (
+            <View key={benefit} style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <View style={{
+                height: 24,
+                width: 24,
+                borderRadius: 12,
+                borderWidth: 1.5,
+                borderColor: t.amber,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Text style={{ color: t.amber, fontSize: 14, fontWeight: '700', lineHeight: 16 }}>
+                  ✓
+                </Text>
+              </View>
+              <Text style={{ flex: 1, color: t.ink2, fontSize: 14, lineHeight: 20 }}>
+                {benefit}
+              </Text>
+            </View>
+          ))}
         </View>
 
         <View style={{
@@ -100,43 +135,21 @@ export default function PremiumScreen() {
           </View>
         ) : (
           <>
-            <TouchableOpacity
-              onPress={() => void presentPaywall()}
-              disabled={actionLoading || !isConfigured}
-              style={{
-                paddingVertical: 16,
-                borderRadius: 99,
-                alignItems: 'center',
-                backgroundColor: actionLoading || !isConfigured ? t.bg3 : t.amber,
-                marginBottom: 12,
-              }}
-              activeOpacity={0.85}
-            >
-              {actionLoading ? (
-                <ActivityIndicator color={t.ink4} />
-              ) : (
-                <Text style={{ fontSize: 15, fontWeight: '700', color: isConfigured ? t.onAccent : t.ink4, letterSpacing: 0 }}>
-                  {isPremium ? 'View Premium options' : 'Open Premium paywall'}
-                </Text>
-              )}
-            </TouchableOpacity>
-
             <View style={{ gap: 10, marginTop: 6 }}>
-              {PLANS.map(plan => {
-                const planPackage = getPlanPackage(plan.key);
-                const price = planPackage?.product.priceString ?? 'Not configured';
+              {availablePlans.map(plan => {
+                const price = plan.package?.product.priceString ?? '';
+                const selected = selectedAvailablePlan?.key === plan.key;
                 return (
                   <TouchableOpacity
                     key={plan.key}
-                    onPress={() => void purchasePlan(plan.key)}
-                    disabled={actionLoading || !planPackage}
+                    onPress={() => setSelectedPlan(plan.key)}
+                    disabled={actionLoading}
                     style={{
                       borderRadius: 12,
-                      backgroundColor: t.bg3,
-                      borderWidth: 0.5,
-                      borderColor: t.line,
+                      backgroundColor: selected ? t.amberSoft : t.bg3,
+                      borderWidth: selected ? 1 : 0.5,
+                      borderColor: selected ? t.amber + '70' : t.line,
                       padding: 16,
-                      opacity: planPackage ? 1 : 0.62,
                     }}
                     activeOpacity={0.78}
                   >
@@ -144,7 +157,7 @@ export default function PremiumScreen() {
                       <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: t.ink }}>
                         {plan.title}
                       </Text>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: planPackage ? t.amber : t.ink4 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: t.amber }}>
                         {price}
                       </Text>
                     </View>
@@ -155,6 +168,50 @@ export default function PremiumScreen() {
                 );
               })}
             </View>
+
+            {!availablePlans.length && (
+              <View style={{
+                borderRadius: 12,
+                backgroundColor: t.bg3,
+                borderWidth: 0.5,
+                borderColor: t.line,
+                padding: 16,
+              }}>
+                <Text style={{ fontSize: 14, lineHeight: 20, color: t.ink3 }}>
+                  No purchase options are available yet. Check the RevenueCat offering setup for the current app.
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              onPress={() => void purchasePlan(selectedAvailablePlan?.key ?? fallbackPlan)}
+              disabled={actionLoading || !isConfigured || !selectedAvailablePlan}
+              style={{
+                paddingVertical: 16,
+                borderRadius: 99,
+                alignItems: 'center',
+                backgroundColor: actionLoading || !isConfigured || !selectedAvailablePlan ? t.bg3 : t.amber,
+                marginTop: 16,
+              }}
+              activeOpacity={0.85}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color={t.ink4} />
+              ) : (
+                <Text style={{
+                  fontSize: 15,
+                  fontWeight: '700',
+                  color: isConfigured && selectedAvailablePlan ? t.onAccent : t.ink4,
+                  letterSpacing: 0,
+                }}>
+                  Continue
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <Text style={{ marginTop: 10, textAlign: 'center', fontSize: 12, lineHeight: 17, color: t.ink4 }}>
+              Apple will confirm before you subscribe.
+            </Text>
 
             {!isConfigured && (
               <Text style={{ marginTop: 14, fontSize: 12.5, lineHeight: 18, color: t.red }}>

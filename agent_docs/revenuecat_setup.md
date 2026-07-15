@@ -58,8 +58,7 @@ yearly -> product yearly
 lifetime -> product lifetime
 ```
 
-9. Configure a RevenueCat Paywall for the `default` offering.
-10. Configure Customer Center before showing the Manage button in production.
+9. Configure Customer Center before showing the Manage button in production.
 
 ## App Store Connect
 
@@ -82,8 +81,9 @@ Test flow:
 1. Sign in to Talkd.
 2. Open Profile.
 3. Tap Talkd Premium.
-4. Open the RevenueCat paywall.
-5. Purchase with a sandbox Apple account.
-6. Confirm Profile shows Talkd Premium as Active.
-7. Test Restore.
-8. Test Manage through RevenueCat Customer Center.
+4. Select an available plan.
+5. Tap Continue.
+6. Purchase with a sandbox Apple account from the native Apple sheet.
+7. Confirm Profile shows Talkd Premium as Active.
+8. Test Restore.
+9. Test Manage through RevenueCat Customer Center.

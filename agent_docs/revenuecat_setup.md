@@ -10,7 +10,8 @@ The app expects these identifiers:
 RevenueCat API key: test_HnnUJcqBNpWrlvcZqoofkikVEeF
 Entitlement ID: Talkd Premium
 Offering ID: default
-Products/packages: monthly, yearly
+Packages: monthly, yearly
+Product IDs: monthly, talkd_premium_yearly
 ```
 
 The public SDK key is configured in `lib/revenueCat.ts`. For production builds, prefer setting the same value through:
@@ -33,7 +34,7 @@ com.yusufberatnegiz.talkd
 
 ```txt
 monthly
-yearly
+talkd_premium_yearly
 ```
 
 5. Create entitlement:
@@ -53,7 +54,7 @@ default
 
 ```txt
 monthly -> product monthly
-yearly -> product yearly
+yearly -> product talkd_premium_yearly
 ```
 
 9. Configure Customer Center before showing the Manage button in production.
@@ -64,7 +65,7 @@ Create matching in-app purchases/subscriptions before App Review:
 
 ```txt
 monthly: auto-renewable monthly subscription
-yearly: auto-renewable yearly subscription
+talkd_premium_yearly: auto-renewable yearly subscription
 ```
 
 All products should unlock the same RevenueCat entitlement: `Talkd Premium`.
@@ -73,7 +74,7 @@ Launch pricing:
 
 ```txt
 monthly: $2.99, shown as on sale from $5.99
-yearly: $24.99 or nearest $25 App Store price point, shown as on sale from $35.99
+talkd_premium_yearly: $14.99, shown as on sale from $35.99
 ```
 
 ## Testing

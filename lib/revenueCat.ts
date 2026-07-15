@@ -15,7 +15,7 @@ export const REVENUECAT_OFFERING_ID = 'default';
 
 export const REVENUECAT_PRODUCTS = {
   lifetime: 'lifetime',
-  yearly: 'yearly',
+  yearly: 'talkd_premium_yearly',
   monthly: 'monthly',
 } as const;
 

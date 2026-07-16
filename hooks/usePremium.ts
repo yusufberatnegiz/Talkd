@@ -27,11 +27,13 @@ interface UsePremiumResult {
 }
 
 const PREMIUM_PRODUCT_IDS = PREMIUM_PLANS.map(plan => plan.productId);
+const MISSING_NATIVE_IAP_MESSAGE = 'Premium purchases require an iOS development build or TestFlight build with StoreKit enabled.';
 
 export function usePremium(): UsePremiumResult {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
+  const [nativeIapAvailable, setNativeIapAvailable] = useState(Platform.OS === 'ios');
   const {
     connected,
     subscriptions,
@@ -85,6 +87,12 @@ export function usePremium(): UsePremiumResult {
       return;
     }
 
+    if (!nativeIapAvailable) {
+      setLoading(false);
+      setError(MISSING_NATIVE_IAP_MESSAGE);
+      return;
+    }
+
     if (!connected) return;
 
     setLoading(true);
@@ -96,11 +104,16 @@ export function usePremium(): UsePremiumResult {
     } catch (refreshError: unknown) {
       console.warn('Could not refresh Apple subscriptions', refreshError);
       Sentry.captureException(refreshError);
+      if (isMissingNativeModuleError(refreshError)) {
+        setNativeIapAvailable(false);
+        setError(MISSING_NATIVE_IAP_MESSAGE);
+        return;
+      }
       setError(getPremiumErrorMessage(refreshError));
     } finally {
       setLoading(false);
     }
-  }, [connected, fetchProducts, getActiveSubscriptions, getAvailablePurchases]);
+  }, [connected, fetchProducts, getActiveSubscriptions, getAvailablePurchases, nativeIapAvailable]);
 
   useEffect(() => {
     void refresh();
@@ -119,22 +132,43 @@ export function usePremium(): UsePremiumResult {
   }, [finishTransaction, getActiveSubscriptions, getAvailablePurchases]);
 
   useEffect(() => {
-    if (Platform.OS !== 'ios') return undefined;
+    if (Platform.OS !== 'ios' || !nativeIapAvailable) return undefined;
 
-    const subscription = purchaseUpdatedListener(purchase => {
-      void finishPremiumPurchases([purchase]).catch((purchaseUpdateError: unknown) => {
-        console.warn('Could not finish Apple purchase update', purchaseUpdateError);
-        Sentry.captureException(purchaseUpdateError);
-        setError(getPremiumErrorMessage(purchaseUpdateError));
+    try {
+      const subscription = purchaseUpdatedListener(purchase => {
+        void finishPremiumPurchases([purchase]).catch((purchaseUpdateError: unknown) => {
+          console.warn('Could not finish Apple purchase update', purchaseUpdateError);
+          Sentry.captureException(purchaseUpdateError);
+          if (isMissingNativeModuleError(purchaseUpdateError)) {
+            setNativeIapAvailable(false);
+            setError(MISSING_NATIVE_IAP_MESSAGE);
+            return;
+          }
+          setError(getPremiumErrorMessage(purchaseUpdateError));
+        });
       });
-    });
 
-    return () => subscription.remove();
-  }, [finishPremiumPurchases]);
+      return () => subscription.remove();
+    } catch (listenerError: unknown) {
+      console.warn('Apple purchase listener unavailable', listenerError);
+      if (!isMissingNativeModuleError(listenerError)) {
+        Sentry.captureException(listenerError);
+      }
+      setNativeIapAvailable(false);
+      setLoading(false);
+      setError(MISSING_NATIVE_IAP_MESSAGE);
+      return undefined;
+    }
+  }, [finishPremiumPurchases, nativeIapAvailable]);
 
   const purchasePlan = useCallback(async (plan: PremiumPlan): Promise<boolean> => {
     if (Platform.OS !== 'ios') {
       setError('Talkd Premium subscriptions are available on iOS.');
+      return false;
+    }
+
+    if (!nativeIapAvailable) {
+      setError(MISSING_NATIVE_IAP_MESSAGE);
       return false;
     }
 
@@ -167,17 +201,27 @@ export function usePremium(): UsePremiumResult {
       if (!isPurchaseCancelled(purchaseError)) {
         console.warn('Could not complete Apple purchase', purchaseError);
         Sentry.captureException(purchaseError);
-        setError(getPremiumErrorMessage(purchaseError));
+        if (isMissingNativeModuleError(purchaseError)) {
+          setNativeIapAvailable(false);
+          setError(MISSING_NATIVE_IAP_MESSAGE);
+        } else {
+          setError(getPremiumErrorMessage(purchaseError));
+        }
       }
       return false;
     } finally {
       setActionLoading(false);
     }
-  }, [connected, finishPremiumPurchases, productByPlan, requestPurchase]);
+  }, [connected, finishPremiumPurchases, nativeIapAvailable, productByPlan, requestPurchase]);
 
   const restorePurchases = useCallback(async (): Promise<boolean> => {
     if (Platform.OS !== 'ios') {
       setError('Talkd Premium subscriptions are available on iOS.');
+      return false;
+    }
+
+    if (!nativeIapAvailable) {
+      setError(MISSING_NATIVE_IAP_MESSAGE);
       return false;
     }
 
@@ -191,17 +235,26 @@ export function usePremium(): UsePremiumResult {
     } catch (restoreError: unknown) {
       console.warn('Could not restore Apple purchases', restoreError);
       Sentry.captureException(restoreError);
-      setError(getPremiumErrorMessage(restoreError));
+      if (isMissingNativeModuleError(restoreError)) {
+        setNativeIapAvailable(false);
+        setError(MISSING_NATIVE_IAP_MESSAGE);
+      } else {
+        setError(getPremiumErrorMessage(restoreError));
+      }
       return false;
     } finally {
       setActionLoading(false);
     }
-  }, [getActiveSubscriptions, getAvailablePurchases, hasActiveSubscriptions, restoreStorePurchases]);
+  }, [getActiveSubscriptions, getAvailablePurchases, hasActiveSubscriptions, nativeIapAvailable, restoreStorePurchases]);
 
   const openManageSubscriptions = useCallback(async (): Promise<void> => {
     setActionLoading(true);
     setError('');
     try {
+      if (!nativeIapAvailable) {
+        setError(MISSING_NATIVE_IAP_MESSAGE);
+        return;
+      }
       if (Platform.OS === 'ios') {
         await showManageSubscriptionsIOS();
       } else {
@@ -211,11 +264,16 @@ export function usePremium(): UsePremiumResult {
     } catch (manageError: unknown) {
       console.warn('Could not open Apple subscription management', manageError);
       Sentry.captureException(manageError);
-      setError('Could not open Apple subscription settings on this device.');
+      if (isMissingNativeModuleError(manageError)) {
+        setNativeIapAvailable(false);
+        setError(MISSING_NATIVE_IAP_MESSAGE);
+      } else {
+        setError('Could not open Apple subscription settings on this device.');
+      }
     } finally {
       setActionLoading(false);
     }
-  }, [refresh]);
+  }, [nativeIapAvailable, refresh]);
 
   const getPlanProduct = useCallback((plan: PremiumPlan): ProductSubscription | null => {
     return productByPlan[plan];
@@ -224,7 +282,7 @@ export function usePremium(): UsePremiumResult {
   return {
     loading,
     actionLoading,
-    isPurchaseAvailable: Platform.OS === 'ios' && connected && subscriptions.length > 0,
+    isPurchaseAvailable: Platform.OS === 'ios' && nativeIapAvailable && connected && subscriptions.length > 0,
     isPremium,
     error,
     getPlanProduct,
@@ -233,6 +291,13 @@ export function usePremium(): UsePremiumResult {
     openManageSubscriptions,
     refresh,
   };
+}
+
+function isMissingNativeModuleError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  if (!('message' in error) || typeof error.message !== 'string') return false;
+  return error.message.includes('Cannot find native module')
+    || error.message.includes('ExpoIap');
 }
 
 function normalizePurchases(purchaseResult: Purchase | Purchase[] | null | undefined): Purchase[] {

@@ -16,13 +16,22 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.yusufberatnegiz.talkd",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "plugins": [
       "expo-router",
       "expo-apple-authentication",
       "expo-iap",
       "@sentry/react-native"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6cf8fe0e-76e6-4e10-a716-e2ce10cc4290"
+      }
+    }
   }
 }

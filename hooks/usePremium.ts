@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
-import {
-  deepLinkToSubscriptions,
-  purchaseUpdatedListener,
-  showManageSubscriptionsIOS,
-  useIAP,
-  type ExpoPurchaseError,
-  type ProductSubscription,
-  type Purchase,
-} from 'expo-iap';
+import type { ExpoPurchaseError, ProductSubscription, Purchase } from 'expo-iap';
 import { Sentry } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import { PREMIUM_PLANS, type PremiumPlan } from '@/lib/premium';
@@ -29,6 +21,8 @@ interface UsePremiumResult {
 const PREMIUM_PRODUCT_IDS = PREMIUM_PLANS.map(plan => plan.productId);
 const MISSING_NATIVE_IAP_MESSAGE = 'Premium purchases require an iOS development build or TestFlight build with StoreKit enabled.';
 const UNSUPPORTED_IAP_RUNTIME_MESSAGE = 'Premium purchases are available on iPhone through TestFlight or the App Store.';
+
+type ExpoIapModule = typeof import('expo-iap');
 
 export function usePremium(): UsePremiumResult {
   if (!isAppleIapRuntimeSupported()) {
@@ -59,6 +53,12 @@ function useUnavailablePremium(): UsePremiumResult {
 }
 
 function useApplePremium(): UsePremiumResult {
+  const {
+    deepLinkToSubscriptions,
+    purchaseUpdatedListener,
+    showManageSubscriptionsIOS,
+    useIAP,
+  } = loadExpoIap();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
@@ -327,9 +327,22 @@ function isAppleIapRuntimeSupported(): boolean {
   const constants = Platform.constants as {
     interfaceIdiom?: string;
     isMacCatalyst?: boolean;
+    systemName?: string;
   };
+  const interfaceIdiom = constants.interfaceIdiom?.toLowerCase();
+  const systemName = constants.systemName?.toLowerCase() ?? '';
 
-  return constants.interfaceIdiom !== 'mac' && constants.isMacCatalyst !== true;
+  if (constants.isMacCatalyst === true) return false;
+  if (systemName.includes('mac')) return false;
+  if (interfaceIdiom && interfaceIdiom !== 'phone') return false;
+
+  return true;
+}
+
+function loadExpoIap(): ExpoIapModule {
+  // Lazy load prevents native IAP initialization on Mac TestFlight runtimes.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('expo-iap') as ExpoIapModule;
 }
 
 function isMissingNativeModuleError(error: unknown): boolean {

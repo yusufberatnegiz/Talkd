@@ -28,8 +28,37 @@ interface UsePremiumResult {
 
 const PREMIUM_PRODUCT_IDS = PREMIUM_PLANS.map(plan => plan.productId);
 const MISSING_NATIVE_IAP_MESSAGE = 'Premium purchases require an iOS development build or TestFlight build with StoreKit enabled.';
+const UNSUPPORTED_IAP_RUNTIME_MESSAGE = 'Premium purchases are available on iPhone through TestFlight or the App Store.';
 
 export function usePremium(): UsePremiumResult {
+  if (!isAppleIapRuntimeSupported()) {
+    return useUnavailablePremium();
+  }
+
+  return useApplePremium();
+}
+
+function useUnavailablePremium(): UsePremiumResult {
+  const unavailableProduct = useCallback(() => null, []);
+  const unavailableAction = useCallback(async () => false, []);
+  const unavailableManage = useCallback(async () => undefined, []);
+  const unavailableRefresh = useCallback(async () => undefined, []);
+
+  return {
+    loading: false,
+    actionLoading: false,
+    isPurchaseAvailable: false,
+    isPremium: false,
+    error: Platform.OS === 'ios' ? UNSUPPORTED_IAP_RUNTIME_MESSAGE : 'Talkd Premium is available on iOS.',
+    getPlanProduct: unavailableProduct,
+    purchasePlan: unavailableAction,
+    restorePurchases: unavailableAction,
+    openManageSubscriptions: unavailableManage,
+    refresh: unavailableRefresh,
+  };
+}
+
+function useApplePremium(): UsePremiumResult {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
@@ -291,6 +320,16 @@ export function usePremium(): UsePremiumResult {
     openManageSubscriptions,
     refresh,
   };
+}
+
+function isAppleIapRuntimeSupported(): boolean {
+  if (Platform.OS !== 'ios') return false;
+  const constants = Platform.constants as {
+    interfaceIdiom?: string;
+    isMacCatalyst?: boolean;
+  };
+
+  return constants.interfaceIdiom !== 'mac' && constants.isMacCatalyst !== true;
 }
 
 function isMissingNativeModuleError(error: unknown): boolean {

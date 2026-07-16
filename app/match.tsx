@@ -224,6 +224,7 @@ export default function MatchScreen() {
           role: 'talker',
           allowTalkerFallback: queueType === 'talker',
           preferHelpfulListeners: isPremium,
+          skipListenBackGate: isPremium,
         });
 
         if (isCancelled || matchedRef.current || !result.matched) return;

@@ -44,6 +44,7 @@ Release TODO:
 1. Verify Apple transactions server-side before trusting premium access.
 2. Store only premium access metadata in Supabase.
 3. Re-check premium access from Supabase on app launch after server verification exists.
-4. Test purchases in an iOS development build or TestFlight with a sandbox Apple account.
+4. Move the listen-back Premium bypass from client StoreKit status to Supabase entitlement metadata.
+5. Test purchases in an iOS development build or TestFlight with a sandbox Apple account.
 
 Do not store chat messages while implementing premium access.

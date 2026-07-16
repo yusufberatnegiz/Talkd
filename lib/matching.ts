@@ -33,6 +33,7 @@ export async function findOrCreateMatch(input: {
   role: 'talker' | 'listener';
   allowTalkerFallback: boolean;
   preferHelpfulListeners?: boolean;
+  skipListenBackGate?: boolean;
 }): Promise<MatchQueueResult> {
   const rpcParams = {
     p_topic: input.topic,
@@ -41,6 +42,7 @@ export async function findOrCreateMatch(input: {
     p_role: input.role,
     p_allow_talker_fallback: input.allowTalkerFallback,
     p_priority_listener_preference: input.preferHelpfulListeners === true,
+    p_skip_listen_back_gate: input.skipListenBackGate === true,
   };
 
   const { data, error } = await supabase.rpc('find_or_create_match', rpcParams);

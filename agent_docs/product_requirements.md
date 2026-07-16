@@ -314,7 +314,7 @@ Acceptance Criteria:
 - [x] Preferred listener matching does not expose listener identity or ratings to users
 - [ ] Server-side Apple transaction verification
 - [ ] Supabase premium entitlement metadata
-- [ ] Talk-anytime listen-back gate
+- [x] Talk-anytime listen-back gate
 - [ ] Instant translation
 - [x] Custom theme colors
 

@@ -1,9 +1,12 @@
 import { TopicIcon } from '@/components/TopicIcon';
 import { getTopic } from '@/constants/topics';
+import { usePremium } from '@/hooks/usePremium';
 import { useTheme } from '@/hooks/useTheme';
+import { getListenBackStatus, type ListenBackStatus } from '@/lib/listenBack';
+import { Sentry } from '@/lib/sentry';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const INTENTS = [
@@ -27,14 +30,47 @@ const EXAMPLES: Record<string, string[]> = {
 export default function IntentScreen() {
   const t = useTheme();
   const router = useRouter();
+  const { isPremium, loading: premiumLoading } = usePremium();
   const { topic: topicParam } = useLocalSearchParams<{ topic: string }>();
   const tp = getTopic(topicParam ?? 'any');
 
   const [intent, setIntent] = useState<IntentKey | null>(null);
   const [specific, setSpecific] = useState('');
+  const [listenBackStatus, setListenBackStatus] = useState<ListenBackStatus | null>(null);
+  const [checkingTalkAccess, setCheckingTalkAccess] = useState(true);
+  const [talkAccessError, setTalkAccessError] = useState('');
 
   const examples = EXAMPLES[tp.key] ?? EXAMPLES.any;
   const placeholder = `e.g. "${examples[0]}"`;
+  const listensRequired = listenBackStatus?.listensRequired ?? 0;
+  const talkLocked = !premiumLoading && !isPremium && listensRequired > 0;
+  const ctaDisabled = !intent || checkingTalkAccess || talkLocked;
+  const listenWord = listensRequired === 1 ? 'time' : 'times';
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadTalkAccess() {
+      setCheckingTalkAccess(true);
+      setTalkAccessError('');
+      try {
+        const status = await getListenBackStatus();
+        if (!isMounted) return;
+        setListenBackStatus(status);
+      } catch (error: unknown) {
+        console.warn('Could not load talk access', error);
+        Sentry.captureException(error);
+        if (isMounted) {
+          setTalkAccessError('Could not check talk access. Try again in a moment.');
+        }
+      } finally {
+        if (isMounted) setCheckingTalkAccess(false);
+      }
+    }
+
+    void loadTalkAccess();
+    return () => { isMounted = false; };
+  }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
@@ -135,18 +171,72 @@ export default function IntentScreen() {
 
         {/* CTA */}
         <View style={{ paddingHorizontal: 20, paddingTop: 24 }}>
+          {talkLocked && (
+            <View style={{
+              marginBottom: 14,
+              padding: 14,
+              borderRadius: 16,
+              backgroundColor: t.bg2,
+              borderWidth: 0.5,
+              borderColor: t.amber + '55',
+            }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: t.ink, lineHeight: 20 }}>
+                Listen-back needed
+              </Text>
+              <Text style={{ marginTop: 6, fontSize: 12.5, color: t.ink3, lineHeight: 18 }}>
+                Free accounts listen {listensRequired} more {listenWord} before starting another talk. Talkd Premium skips this.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                <TouchableOpacity
+                  onPress={() => router.push('/listener' as never)}
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: t.amber }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: t.onAccent }}>
+                    Listen now
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.push('/premium' as never)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    backgroundColor: t.bg3,
+                    borderWidth: 0.5,
+                    borderColor: t.line,
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: t.ink }}>
+                    Premium
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          {!!talkAccessError && (
+            <Text style={{ marginBottom: 10, fontSize: 12, color: t.red, lineHeight: 17, textAlign: 'center' }}>
+              {talkAccessError}
+            </Text>
+          )}
           <TouchableOpacity
-            disabled={!intent}
+            disabled={ctaDisabled}
             onPress={() => router.push({ pathname: '/match', params: { topic: tp.key, intent: intent ?? '', specific } } as never)}
             style={{
               paddingVertical: 16, borderRadius: 99, alignItems: 'center',
-              backgroundColor: intent ? tp.hue : t.bg3,
+              backgroundColor: !ctaDisabled ? tp.hue : t.bg3,
             }}
             activeOpacity={0.85}
           >
-            <Text style={{ fontSize: 15, fontWeight: '600', letterSpacing: -0.1, color: intent ? t.onAccent : t.ink4 }}>
-              {intent ? 'Find someone now' : 'Choose one'}
-            </Text>
+            {checkingTalkAccess ? (
+              <ActivityIndicator color={t.ink4} />
+            ) : (
+              <Text style={{ fontSize: 15, fontWeight: '600', letterSpacing: -0.1, color: !ctaDisabled ? t.onAccent : t.ink4 }}>
+                {talkLocked ? 'Listen-back needed' : intent ? 'Find someone now' : 'Choose one'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>

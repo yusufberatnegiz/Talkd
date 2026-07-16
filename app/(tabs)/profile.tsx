@@ -1,11 +1,21 @@
 import { BottomNav } from '@/components/BottomNav';
 import { supabase } from '@/lib/supabase';
-import { type AppearanceChoice, APPEARANCE_LABEL, setAppearance, useAppearance, useTheme } from '@/hooks/useTheme';
+import {
+  type AccentChoice,
+  type AppearanceChoice,
+  ACCENT_OPTIONS,
+  APPEARANCE_LABEL,
+  setAccentChoice,
+  setAppearance,
+  useAccentPreference,
+  useAppearance,
+  useTheme,
+} from '@/hooks/useTheme';
 import { usePremium } from '@/hooks/usePremium';
 import { useUserStats } from '@/hooks/useUserStats';
 import { useRouter } from 'expo-router';
 import {
-  Bell, ChevronRight, Crown, Headphones, HelpCircle,
+  Bell, ChevronRight, Crown, Headphones, HelpCircle, Palette,
   LogOut, Moon, Shield,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -69,6 +79,67 @@ function AppearanceSheet({ current, onSelect, onClose }: {
   );
 }
 
+function AccentSheet({ current, onSelect, onClose }: {
+  current: AccentChoice;
+  onSelect: (c: AccentChoice) => void;
+  onClose: () => void;
+}) {
+  const t = useTheme();
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
+          <View style={{
+            backgroundColor: t.bg2, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+            padding: 20, paddingBottom: 36, borderTopWidth: 0.5, borderColor: t.line,
+          }}>
+            <View style={{ width: 36, height: 4, borderRadius: 99, backgroundColor: t.ink5, alignSelf: 'center', marginBottom: 18 }} />
+            <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 26, color: t.ink, letterSpacing: -0.3, marginBottom: 16 }}>
+              Accent color
+            </Text>
+            <View style={{ gap: 6 }}>
+              {ACCENT_OPTIONS.map(o => {
+                const active = current === o.key;
+                return (
+                  <TouchableOpacity
+                    key={o.key}
+                    onPress={() => { onSelect(o.key); onClose(); }}
+                    style={{
+                      padding: 14, borderRadius: 14,
+                      backgroundColor: active ? t.amberSoft : t.bg3,
+                      borderWidth: active ? 1 : 0.5,
+                      borderColor: active ? t.amber + '60' : t.line,
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <View style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 12,
+                        backgroundColor: o.swatch,
+                        borderWidth: 0.5,
+                        borderColor: t.lineStrong,
+                      }} />
+                      <Text style={{ fontSize: 15, color: active ? t.amber : t.ink }}>{o.label}</Text>
+                    </View>
+                    {active && <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: t.amber }} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 type MenuItem = { icon: LucideIcon; label: string; value?: string; destructive?: boolean; onPress?: () => void };
 type MenuSection = { section: string; items: MenuItem[] };
 
@@ -76,7 +147,9 @@ export default function ProfileScreen() {
   const t = useTheme();
   const router = useRouter();
   const { preference: appearance } = useAppearance();
+  const { preference: accent, label: accentLabel } = useAccentPreference();
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [accentOpen, setAccentOpen] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const { isPremium, loading: premiumLoading, isPurchaseAvailable } = usePremium();
 
@@ -92,6 +165,18 @@ export default function ProfileScreen() {
         },
         { icon: Bell, label: 'Notifications', value: 'Device settings', onPress: () => Linking.openSettings() },
         { icon: Moon, label: 'Appearance', value: APPEARANCE_LABEL[appearance], onPress: () => setAppearanceOpen(true) },
+        {
+          icon: Palette,
+          label: 'Accent color',
+          value: premiumLoading ? 'Checking' : isPremium ? accentLabel : 'Premium',
+          onPress: () => {
+            if (isPremium) {
+              setAccentOpen(true);
+              return;
+            }
+            router.push('/premium' as never);
+          },
+        },
         { icon: Shield, label: 'Privacy & data', onPress: () => router.push('/privacy' as never) },
       ],
     },
@@ -264,6 +349,13 @@ export default function ProfileScreen() {
           current={appearance}
           onSelect={setAppearance}
           onClose={() => setAppearanceOpen(false)}
+        />
+      )}
+      {accentOpen && (
+        <AccentSheet
+          current={accent}
+          onSelect={setAccentChoice}
+          onClose={() => setAccentOpen(false)}
         />
       )}
     </SafeAreaView>

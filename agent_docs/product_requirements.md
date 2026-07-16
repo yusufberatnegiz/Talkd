@@ -316,7 +316,7 @@ Acceptance Criteria:
 - [ ] Supabase premium entitlement metadata
 - [ ] Talk-anytime listen-back gate
 - [ ] Instant translation
-- [ ] Custom theme colors
+- [x] Custom theme colors
 
 ---
 

@@ -1,5 +1,6 @@
-import { SESSION_DURATION_SECONDS, SESSION_WARNING_SECONDS } from '@/constants/config';
+import { PREMIUM_SESSION_EXTENSION_SECONDS, SESSION_DURATION_SECONDS, SESSION_WARNING_SECONDS } from '@/constants/config';
 import { getTopic } from '@/constants/topics';
+import { usePremium } from '@/hooks/usePremium';
 import { useTheme } from '@/hooks/useTheme';
 import { Sentry } from '@/lib/sentry';
 import { endSession } from '@/lib/sessionLifecycle';
@@ -244,11 +245,15 @@ function ExitSheet({ onClose, onConfirm }: { onClose: () => void; onConfirm: () 
   );
 }
 
-function ContinueSheet({ youAgreed, theyAgreed, onAgree, onDecline }: {
-  youAgreed: boolean; theyAgreed: boolean; onAgree: () => void; onDecline: () => void;
+function ContinueSheet({ youAgreed, theyAgreed, extensionAvailable, onAgree, onDecline }: {
+  youAgreed: boolean;
+  theyAgreed: boolean;
+  extensionAvailable: boolean;
+  onAgree: () => void;
+  onDecline: () => void;
 }) {
   const t = useTheme();
-  const both = youAgreed && theyAgreed;
+  const both = youAgreed && theyAgreed && extensionAvailable;
   return (
     <Modal visible transparent animationType="slide">
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}>
@@ -258,12 +263,14 @@ function ContinueSheet({ youAgreed, theyAgreed, onAgree, onDecline }: {
         }}>
           <View style={{ width: 36, height: 4, borderRadius: 99, backgroundColor: t.ink5, alignSelf: 'center', marginBottom: 18 }} />
           <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 26, color: t.ink, letterSpacing: -0.3, marginBottom: 4 }}>
-            {both ? 'No timer now.' : "Time's up."}
+            {both ? '15 more minutes.' : "Time's up."}
           </Text>
           <Text style={{ fontSize: 13, color: t.ink3, marginBottom: 20, lineHeight: 18 }}>
             {both
-              ? 'You both chose to keep going. Stay as long as you need.'
-              : 'If you both want, you can keep talking without a timer. Either of you can leave any time.'}
+              ? 'You both agreed to extend this chat once.'
+              : extensionAvailable
+                ? 'Talkd Premium can add 15 minutes when both people agree.'
+                : 'Extending a chat requires Talkd Premium. You can end here safely.'}
           </Text>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
             {(['You', 'Them'] as const).map((label, i) => {
@@ -285,15 +292,15 @@ function ContinueSheet({ youAgreed, theyAgreed, onAgree, onDecline }: {
           {!both && (
             <>
               <TouchableOpacity
-                disabled={youAgreed}
+                disabled={youAgreed || !extensionAvailable}
                 onPress={onAgree}
                 style={{
                   paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginBottom: 8,
-                  backgroundColor: youAgreed ? t.bg3 : t.amber,
+                  backgroundColor: youAgreed || !extensionAvailable ? t.bg3 : t.amber,
                 }}
               >
-                <Text style={{ fontSize: 14.5, fontWeight: '600', color: youAgreed ? t.ink3 : t.onAccent }}>
-                  {youAgreed ? 'Waiting for them…' : 'Keep talking (no timer)'}
+                <Text style={{ fontSize: 14.5, fontWeight: '600', color: youAgreed || !extensionAvailable ? t.ink3 : t.onAccent }}>
+                  {youAgreed ? 'Waiting for them…' : extensionAvailable ? 'Add 15 minutes' : 'Premium needed'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={onDecline} style={{ paddingVertical: 14, alignItems: 'center' }}>
@@ -310,6 +317,7 @@ function ContinueSheet({ youAgreed, theyAgreed, onAgree, onDecline }: {
 export default function ChatScreen() {
   const t = useTheme();
   const router = useRouter();
+  const { isPremium } = usePremium();
   const scrollRef = useRef<ScrollView>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -321,6 +329,7 @@ export default function ChatScreen() {
   const disconnectSessionMarkedRef = useRef(false);
   const endingRef = useRef(false);
   const timeLeftRef = useRef(SESSION_DURATION_SECONDS);
+  const isPremiumRef = useRef(false);
 
   const {
     topic: topicParam, specific, specific_from,
@@ -337,12 +346,13 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState('');
   const [timeLeft, setTimeLeft] = useState(SESSION_DURATION_SECONDS);
   const [timerActive, setTimerActive] = useState(true);
-  const [untimed, setUntimed] = useState(false);
+  const [extensionUsed, setExtensionUsed] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
   const [continueOpen, setContinueOpen] = useState(false);
   const [youAgreed, setYouAgreed] = useState(false);
   const [theyAgreed, setTheyAgreed] = useState(false);
+  const [peerCanExtend, setPeerCanExtend] = useState(false);
   const [crisisOpen, setCrisisOpen] = useState(false);
   const [typing, setTyping] = useState(false);
   const [sendError, setSendError] = useState('');
@@ -355,6 +365,10 @@ export default function ChatScreen() {
   useEffect(() => {
     timeLeftRef.current = timeLeft;
   }, [timeLeft]);
+
+  useEffect(() => {
+    isPremiumRef.current = isPremium;
+  }, [isPremium]);
 
   function formatClock() {
     const d = new Date();
@@ -401,7 +415,10 @@ export default function ChatScreen() {
   }
 
   function getElapsedSeconds() {
-    return Math.min(7200, Math.max(0, SESSION_DURATION_SECONDS - timeLeftRef.current));
+    const elapsed = extensionUsed
+      ? SESSION_DURATION_SECONDS + (PREMIUM_SESSION_EXTENSION_SECONDS - timeLeftRef.current)
+      : SESSION_DURATION_SECONDS - timeLeftRef.current;
+    return Math.min(7200, Math.max(0, elapsed));
   }
 
   function markPeerSeen() {
@@ -503,9 +520,10 @@ export default function ChatScreen() {
             }, PEER_DISCONNECT_GRACE_MS);
           }
         })
-        .on('broadcast', { event: 'heartbeat' }, ({ payload }: { payload: { user_id?: string } }) => {
+        .on('broadcast', { event: 'heartbeat' }, ({ payload }: { payload: { user_id?: string; premium_extend?: boolean } }) => {
           if (payload.user_id === verifiedOtherUserId) {
             markPeerSeen();
+            if (payload.premium_extend) setPeerCanExtend(true);
           }
         })
         .on('broadcast', { event: 'message' }, ({ payload }: { payload: { id?: string; text: string; ts: string } }) => {
@@ -513,9 +531,19 @@ export default function ChatScreen() {
           setMessages(prev => [...prev, { id: payload.id ?? createMessageId(), from: 'them', text: payload.text, time: payload.ts }]);
           setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
         })
-        .on('broadcast', { event: 'continue_agree' }, () => {
+        .on('broadcast', { event: 'continue_agree' }, ({ payload }: { payload: { can_extend?: boolean } }) => {
           markPeerSeen();
+          if (payload.can_extend) setPeerCanExtend(true);
           setTheyAgreed(true);
+        })
+        .on('broadcast', { event: 'session_extended' }, () => {
+          markPeerSeen();
+          setContinueOpen(false);
+          setYouAgreed(false);
+          setTheyAgreed(false);
+          setExtensionUsed(true);
+          setTimeLeft(PREMIUM_SESSION_EXTENSION_SECONDS);
+          setTimerActive(true);
         })
         .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { isTyping: boolean } }) => {
           markPeerSeen();
@@ -527,9 +555,9 @@ export default function ChatScreen() {
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             void channel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
-            void channel.send({ type: 'broadcast', event: 'heartbeat', payload: { user_id: currentUserId } });
+            void channel.send({ type: 'broadcast', event: 'heartbeat', payload: { user_id: currentUserId, premium_extend: isPremiumRef.current } });
             heartbeatIntervalRef.current = setInterval(() => {
-              void channel.send({ type: 'broadcast', event: 'heartbeat', payload: { user_id: currentUserId } });
+              void channel.send({ type: 'broadcast', event: 'heartbeat', payload: { user_id: currentUserId, premium_extend: isPremiumRef.current } });
             }, HEARTBEAT_INTERVAL_MS);
             heartbeatCheckIntervalRef.current = setInterval(() => {
               const lastPeerHeartbeat = lastPeerHeartbeatRef.current;
@@ -574,23 +602,35 @@ export default function ChatScreen() {
 
   // Timer countdown
   useEffect(() => {
-    if (!timerActive || untimed || endingRef.current) return;
+    if (!timerActive || endingRef.current) return;
     if (timeLeft <= 0) {
       setTimerActive(false);
+      if (extensionUsed) {
+        void goToRating();
+        return;
+      }
       setContinueOpen(true);
       return;
     }
     const id = setTimeout(() => setTimeLeft(n => n - 1), 1000);
     return () => clearTimeout(id);
-  }, [timeLeft, timerActive, untimed]);
+  }, [timeLeft, timerActive, extensionUsed]);
 
-  // Both agreed to continue
+  // Both agreed to extend once
   useEffect(() => {
-    if (youAgreed && theyAgreed && continueOpen) {
-      const id = setTimeout(() => { setContinueOpen(false); setUntimed(true); }, 900);
+    if (youAgreed && theyAgreed && continueOpen && !extensionUsed && (isPremium || peerCanExtend)) {
+      const id = setTimeout(() => {
+        setContinueOpen(false);
+        setYouAgreed(false);
+        setTheyAgreed(false);
+        setExtensionUsed(true);
+        setTimeLeft(PREMIUM_SESSION_EXTENSION_SECONDS);
+        setTimerActive(true);
+        void channelRef.current?.send({ type: 'broadcast', event: 'session_extended', payload: {} });
+      }, 900);
       return () => clearTimeout(id);
     }
-  }, [youAgreed, theyAgreed, continueOpen]);
+  }, [youAgreed, theyAgreed, continueOpen, extensionUsed, isPremium, peerCanExtend]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: false });
@@ -709,12 +749,19 @@ export default function ChatScreen() {
   }
 
   async function handleContinueAgree() {
+    if (!isPremium && !peerCanExtend) return;
     setYouAgreed(true);
-    await channelRef.current?.send({ type: 'broadcast', event: 'continue_agree', payload: {} });
+    await channelRef.current?.send({
+      type: 'broadcast',
+      event: 'continue_agree',
+      payload: { can_extend: isPremium },
+    });
   }
 
   const isWarning = timeLeft <= SESSION_WARNING_SECONDS && timeLeft > 0;
-  const sessionStatusLabel = peerDisconnected ? 'Disconnected' : untimed ? 'No timer' : formatTime(timeLeft);
+  const extensionAvailable = !extensionUsed && (isPremium || peerCanExtend);
+  const currentTimerTotal = extensionUsed ? PREMIUM_SESSION_EXTENSION_SECONDS : SESSION_DURATION_SECONDS;
+  const sessionStatusLabel = peerDisconnected ? 'Disconnected' : extensionUsed ? `${formatTime(timeLeft)} extended` : formatTime(timeLeft);
 
   if (joinError) {
     return (
@@ -799,26 +846,24 @@ export default function ChatScreen() {
         </View>
 
         {/* Progress bar */}
-        {!untimed && (
-          <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={{ flex: 1, height: 2, borderRadius: 99, backgroundColor: t.bg3, overflow: 'hidden' }}>
-              <View style={{
-                height: '100%',
-                width: `${(timeLeft / SESSION_DURATION_SECONDS) * 100}%`,
-                backgroundColor: isWarning ? t.red : hue,
-              }} />
-            </View>
-            <Text style={{ fontSize: 10.5, color: t.ink4 }}>
-              {isWarning ? 'ending soon' : 'session time'}
-            </Text>
+        <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: extensionUsed ? 3 : 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flex: 1, height: 2, borderRadius: 99, backgroundColor: t.bg3, overflow: 'hidden' }}>
+            <View style={{
+              height: '100%',
+              width: `${(timeLeft / currentTimerTotal) * 100}%`,
+              backgroundColor: isWarning ? t.red : hue,
+            }} />
           </View>
-        )}
+          <Text style={{ fontSize: 10.5, color: t.ink4 }}>
+            {isWarning ? 'ending soon' : extensionUsed ? 'extended time' : 'session time'}
+          </Text>
+        </View>
 
-        {untimed && (
-          <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {extensionUsed && (
+          <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: hue }} />
             <Text style={{ fontSize: 11, color: t.ink3, letterSpacing: 0.1 }}>
-              Both of you chose to keep talking — no timer
+              You both added 15 minutes
             </Text>
           </View>
         )}
@@ -946,6 +991,7 @@ export default function ChatScreen() {
         <ContinueSheet
           youAgreed={youAgreed}
           theyAgreed={theyAgreed}
+          extensionAvailable={extensionAvailable}
           onAgree={() => void handleContinueAgree()}
           onDecline={() => void goToRating()}
         />

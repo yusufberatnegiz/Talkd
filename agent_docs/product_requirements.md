@@ -142,11 +142,15 @@ Acceptance Criteria:
 - Duration: 900 seconds.
 - Warning at 2:00.
 - Uses `SESSION_DURATION_SECONDS`.
+- Talkd Premium can add one 15-minute extension if both people agree.
+- Free users cannot extend a chat unless the other participant has Talkd Premium.
 
 Acceptance Criteria:
 - [x] Timer visible to both users
 - [x] Warning state at 2:00
 - [x] Messages wiped when session ends
+- [x] Premium extension agreement is mutual
+- [x] Premium extension is limited to once per chat
 - [ ] Timer does not conflict with manual exit
 - [ ] Timer does not create duplicate navigation
 - [ ] Session metadata is updated when session ends
@@ -290,7 +294,29 @@ Acceptance Criteria:
 - More topics unless explicitly requested
 - Turkish localization
 - Android
-- Premium features
+
+## F13 - Talkd Premium
+
+Premium must not gate safety, anonymity, reporting, moderation, or basic listener access.
+
+Features:
+- Talk anytime without the free listen-back requirement
+- Priority matching
+- Preferred listener matching using anonymous rating aggregates
+- One +15 minute chat extension when both people agree
+- Instant translation
+- Custom theme colors
+
+Acceptance Criteria:
+- [x] Premium purchase flow uses direct Apple StoreKit through `expo-iap`
+- [x] Premium paywall lists the feature contract accurately
+- [x] One +15 minute extension requires both participants to agree
+- [x] Preferred listener matching does not expose listener identity or ratings to users
+- [ ] Server-side Apple transaction verification
+- [ ] Supabase premium entitlement metadata
+- [ ] Talk-anytime listen-back gate
+- [ ] Instant translation
+- [ ] Custom theme colors
 
 ---
 

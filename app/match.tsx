@@ -1,6 +1,7 @@
 import { TopicIcon } from '@/components/TopicIcon';
 import { MATCH_TIMEOUT_MS } from '@/constants/config';
 import { getTopic } from '@/constants/topics';
+import { usePremium } from '@/hooks/usePremium';
 import { useTheme } from '@/hooks/useTheme';
 import { cancelMatchQueue, findOrCreateMatch } from '@/lib/matching';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -162,6 +163,7 @@ function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: stri
 export default function MatchScreen() {
   const t = useTheme();
   const router = useRouter();
+  const { isPremium } = usePremium();
   const { topic: topicParam, intent: intentParam, specific: specificParam } = useLocalSearchParams<{
     topic: string;
     intent: string;
@@ -221,6 +223,7 @@ export default function MatchScreen() {
           intent,
           role: 'talker',
           allowTalkerFallback: queueType === 'talker',
+          preferHelpfulListeners: isPremium,
         });
 
         if (isCancelled || matchedRef.current || !result.matched) return;
@@ -271,7 +274,7 @@ export default function MatchScreen() {
       if (pollTimer) clearInterval(pollTimer);
       if (!matchedRef.current) void cancelMatchQueue();
     };
-  }, [fallback, showOptions, queueType, pollKey, tp.key, specific, intent]);
+  }, [fallback, showOptions, queueType, pollKey, tp.key, specific, intent, isPremium]);
 
   async function handleCancel() {
     if (cancellingRef.current) return;

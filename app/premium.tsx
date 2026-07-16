@@ -1,6 +1,6 @@
 import { usePremium } from '@/hooks/usePremium';
 import { useTheme } from '@/hooks/useTheme';
-import { PREMIUM_ENTITLEMENT_LABEL, PREMIUM_PLANS, type PremiumPlan } from '@/lib/premium';
+import { PREMIUM_ENTITLEMENT_LABEL, PREMIUM_FEATURES, PREMIUM_PLANS, type PremiumPlan } from '@/lib/premium';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, BadgeCheck, Crown, RefreshCw, ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
@@ -73,12 +73,8 @@ export default function PremiumScreen() {
         </View>
 
         <View style={{ gap: 10, marginBottom: 18 }}>
-          {[
-            'Private premium access on this account',
-            'Restore purchases anytime',
-            'Helps keep Talkd moderated and reliable',
-          ].map(benefit => (
-            <View key={benefit} style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          {PREMIUM_FEATURES.map(feature => (
+            <View key={feature.key} style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
               <View style={{
                 height: 24,
                 width: 24,
@@ -92,9 +88,14 @@ export default function PremiumScreen() {
                   ✓
                 </Text>
               </View>
-              <Text style={{ flex: 1, color: t.ink2, fontSize: 14, lineHeight: 20 }}>
-                {benefit}
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: t.ink2, fontSize: 14, lineHeight: 20, fontWeight: '600' }}>
+                  {feature.label}
+                </Text>
+                <Text style={{ color: t.ink3, fontSize: 12.5, lineHeight: 18 }}>
+                  {feature.detail}
+                </Text>
+              </View>
             </View>
           ))}
         </View>

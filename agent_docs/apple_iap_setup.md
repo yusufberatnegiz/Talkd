@@ -30,6 +30,15 @@ Implemented:
 4. Restore purchases through Apple's restore flow.
 5. Open Apple subscription management.
 
+Premium feature contract:
+
+1. Talk anytime without the free listen-back requirement.
+2. Priority matching.
+3. Preferred listener matching using anonymous rating aggregates.
+4. One +15 minute chat extension when both people agree.
+5. Instant translation.
+6. Custom theme colors.
+
 Release TODO:
 
 1. Verify Apple transactions server-side before trusting premium access.

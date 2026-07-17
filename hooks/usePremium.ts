@@ -18,14 +18,18 @@ interface UsePremiumResult {
   refresh: () => Promise<void>;
 }
 
+interface UsePremiumOptions {
+  enableStoreKit?: boolean;
+}
+
 const PREMIUM_PRODUCT_IDS = PREMIUM_PLANS.map(plan => plan.productId);
 const MISSING_NATIVE_IAP_MESSAGE = 'Premium purchases require an iOS development build or TestFlight build with StoreKit enabled.';
 const UNSUPPORTED_IAP_RUNTIME_MESSAGE = 'Premium purchases are available on iPhone through TestFlight or the App Store.';
 
 type ExpoIapModule = typeof import('expo-iap');
 
-export function usePremium(): UsePremiumResult {
-  if (!isAppleIapRuntimeSupported()) {
+export function usePremium(options: UsePremiumOptions = {}): UsePremiumResult {
+  if (!options.enableStoreKit || !isAppleIapRuntimeSupported()) {
     return useUnavailablePremium();
   }
 

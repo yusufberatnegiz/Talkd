@@ -20,7 +20,7 @@ export default function PremiumScreen() {
     purchasePlan,
     restorePurchases,
     openManageSubscriptions,
-  } = usePremium();
+  } = usePremium({ enableStoreKit: true });
   const [selectedPlan, setSelectedPlan] = useState<PremiumPlan>('monthly');
   const selectedProduct = getPlanProduct(selectedPlan);
   const canPurchaseSelectedPlan = isPurchaseAvailable && !!selectedProduct;

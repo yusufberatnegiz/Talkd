@@ -1,5 +1,7 @@
-import { Sentry, initSentry, isSentryEnabled } from '@/lib/sentry';
-import { supabase } from '@/lib/supabase';
+import { AppErrorBoundary } from '@/components/AppErrorBoundary';
+import { StartupConfigurationError } from '@/components/StartupConfigurationError';
+import { Sentry, isSentryEnabled } from '@/lib/sentry';
+import { missingSupabaseConfig, supabase } from '@/lib/supabase';
 import { ensureOwnProfile } from '@/lib/profile';
 import { hasAcceptedSafetyGuidelines, subscribeSafetyAcceptance } from '@/lib/safetyAcceptance';
 import { markPasswordRecoveryUrl, setPasswordRecoveryActive, subscribePasswordRecoveryActive } from '@/lib/passwordRecovery';
@@ -8,8 +10,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { Linking, View } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
-
-initSentry();
 
 function RootLayout() {
   const router = useRouter();
@@ -119,4 +119,14 @@ function RootLayout() {
   );
 }
 
-export default isSentryEnabled() ? Sentry.wrap(RootLayout) : RootLayout;
+function RootLayoutGuard() {
+  return (
+    <AppErrorBoundary>
+      {missingSupabaseConfig.length > 0
+        ? <StartupConfigurationError missing={missingSupabaseConfig} />
+        : <RootLayout />}
+    </AppErrorBoundary>
+  );
+}
+
+export default isSentryEnabled() ? Sentry.wrap(RootLayoutGuard) : RootLayoutGuard;

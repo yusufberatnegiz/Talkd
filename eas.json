@@ -18,7 +18,9 @@
       "distribution": "internal"
     },
     "production": {
+      "environment": "production",
       "env": {
+        "EXPO_PUBLIC_ENABLE_SENTRY": "true",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       },
       "autoIncrement": true

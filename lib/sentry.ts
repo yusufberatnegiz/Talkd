@@ -16,6 +16,7 @@ export function initSentry() {
   nativeSentry.init({
     dsn: sentryDsn,
     enabled: Boolean(sentryDsn),
+    attachStacktrace: true,
     sendDefaultPii: false,
     tracesSampleRate: 0.1,
   });

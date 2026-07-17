@@ -1,4 +1,4 @@
-import { Sentry, initSentry } from '@/lib/sentry';
+import { Sentry, initSentry, isSentryEnabled } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import { ensureOwnProfile } from '@/lib/profile';
 import { hasAcceptedSafetyGuidelines, subscribeSafetyAcceptance } from '@/lib/safetyAcceptance';
@@ -119,4 +119,4 @@ function RootLayout() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+export default isSentryEnabled() ? Sentry.wrap(RootLayout) : RootLayout;

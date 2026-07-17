@@ -7,7 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "talkd",
-    "jsEngine": "jsc",
     "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",

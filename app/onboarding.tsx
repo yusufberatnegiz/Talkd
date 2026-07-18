@@ -1,78 +1,82 @@
+import { BrandMark } from '@/components/BrandMark';
+import { TopicIcon } from '@/components/TopicIcon';
 import { TOPICS } from '@/constants/topics';
 import { SESSION_DURATION_SECONDS } from '@/constants/config';
 import { useTheme } from '@/hooks/useTheme';
-import { markSafetyGuidelinesAccepted } from '@/lib/safetyAcceptance';
+import { markSafetyGuidelinesAccepted, markSafetyGuidelinesPending } from '@/lib/safetyAcceptance';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
+import { ArrowLeft, ArrowRight, EyeOff, HeartHandshake, MessageCircle, ShieldCheck } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Visual 1 — two glowing circles drifting toward each other
+// Visual 1: a preview of the conversation users are about to enter.
 function Visual1() {
   const t = useTheme();
-  const leftX = useRef(new Animated.Value(-28)).current;
-  const rightX = useRef(new Animated.Value(28)).current;
+  const firstOpacity = useRef(new Animated.Value(0)).current;
+  const secondOpacity = useRef(new Animated.Value(0)).current;
+  const firstY = useRef(new Animated.Value(8)).current;
+  const secondY = useRef(new Animated.Value(8)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(leftX, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(rightX, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        ]),
-        Animated.parallel([
-          Animated.timing(leftX, { toValue: -28, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(rightX, { toValue: 28, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        ]),
-      ])
-    ).start();
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(firstOpacity, { toValue: 1, duration: 360, useNativeDriver: true }),
+        Animated.timing(firstY, { toValue: 0, duration: 360, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(secondOpacity, { toValue: 1, duration: 360, useNativeDriver: true }),
+        Animated.timing(secondY, { toValue: 0, duration: 360, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      ]),
+    ]).start();
   }, []);
 
   return (
-    <View style={{ width: 240, height: 180, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Outer glow circles */}
+    <View style={{ width: 300, height: 190, justifyContent: 'center' }}>
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        borderBottomWidth: 0.5, borderBottomColor: t.line,
+        paddingBottom: 12, marginBottom: 16,
+      }}>
+        <MessageCircle size={17} color={t.amber} strokeWidth={2} />
+        <Text style={{ flex: 1, color: t.ink2, fontSize: 12.5, fontWeight: '600' }}>Anonymous conversation</Text>
+        <Text style={{ color: t.ink4, fontSize: 11 }}>15:00</Text>
+      </View>
+
       <Animated.View style={{
-        position: 'absolute', width: 80, height: 80, borderRadius: 40,
-        backgroundColor: t.amber, opacity: 0.18,
-        transform: [{ translateX: leftX }],
-        left: 20,
-      }} />
+        alignSelf: 'flex-start', maxWidth: 226,
+        borderRadius: 18, borderBottomLeftRadius: 6,
+        backgroundColor: t.bg3, paddingHorizontal: 15, paddingVertical: 11,
+        opacity: firstOpacity, transform: [{ translateY: firstY }],
+      }}>
+        <Text style={{ color: t.ink2, fontSize: 13.5, lineHeight: 19 }}>I could use another perspective.</Text>
+      </Animated.View>
+
       <Animated.View style={{
-        position: 'absolute', width: 80, height: 80, borderRadius: 40,
-        backgroundColor: t.coral, opacity: 0.18,
-        transform: [{ translateX: rightX }],
-        right: 20,
-      }} />
-      {/* Connection line */}
-      <View style={{ width: 80, height: 0.5, backgroundColor: t.lineStrong }} />
-      {/* Inner solid circles */}
-      <Animated.View style={{
-        position: 'absolute', width: 48, height: 48, borderRadius: 24,
-        backgroundColor: t.amber, opacity: 0.65,
-        transform: [{ translateX: leftX }],
-        left: 46,
-      }} />
-      <Animated.View style={{
-        position: 'absolute', width: 48, height: 48, borderRadius: 24,
-        backgroundColor: t.coral, opacity: 0.65,
-        transform: [{ translateX: rightX }],
-        right: 46,
-      }} />
+        alignSelf: 'flex-end', maxWidth: 236, marginTop: 10,
+        borderRadius: 18, borderBottomRightRadius: 6,
+        backgroundColor: t.amberDim, paddingHorizontal: 15, paddingVertical: 11,
+        opacity: secondOpacity, transform: [{ translateY: secondY }],
+      }}>
+        <Text style={{ color: t.ink, fontSize: 13.5, lineHeight: 19 }}>I'm here. What's on your mind?</Text>
+      </Animated.View>
     </View>
   );
 }
 
-// Visual 2 — topic chips stagger fade-in
+// Visual 2: a compact preview of the real topic picker.
 function Visual2() {
-  const chips = Object.values(TOPICS).slice(0, 5);
-  const opacities = useRef(chips.map(() => new Animated.Value(0))).current;
-  const translates = useRef(chips.map(() => new Animated.Value(10))).current;
+  const t = useTheme();
+  const topics = Object.values(TOPICS);
+  const opacities = useRef(topics.map(() => new Animated.Value(0))).current;
+  const translates = useRef(topics.map(() => new Animated.Value(8))).current;
 
   useEffect(() => {
     Animated.stagger(
       120,
-      chips.map((_, i) =>
+      topics.map((_, i) =>
         Animated.parallel([
           Animated.timing(opacities[i], { toValue: 1, duration: 400, useNativeDriver: true }),
           Animated.timing(translates[i], { toValue: 0, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
@@ -82,62 +86,102 @@ function Visual2() {
   }, []);
 
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', maxWidth: 280 }}>
-      {chips.map((tp, i) => (
+    <View style={{ width: 300, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      {topics.map((tp, i) => (
         <Animated.View
           key={tp.key}
           style={{
             opacity: opacities[i],
             transform: [{ translateY: translates[i] }],
-            paddingHorizontal: 14, paddingVertical: 9, borderRadius: 99,
-            backgroundColor: tp.hue + '18', borderWidth: 0.5, borderColor: tp.hue + '44',
+            width: 146, height: 52, borderRadius: 12,
+            backgroundColor: tp.hue + t.topicBgAlpha,
+            borderWidth: 0.5, borderColor: tp.hue + t.topicBorderAlpha,
+            paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 9,
           }}
         >
-          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 13, color: tp.hue }}>{tp.label}</Text>
+          <TopicIcon topicKey={tp.key} color={tp.hue} size={14} tileSize={28} />
+          <Text numberOfLines={2} style={{ flex: 1, fontSize: 11.5, lineHeight: 15, fontWeight: '600', color: t.ink }}>
+            {tp.label}
+          </Text>
         </Animated.View>
       ))}
     </View>
   );
 }
 
-// Visual 3 — breathing "be kind" circle
+// Visual 3: two sides of an anonymous, caring conversation.
 function Visual3() {
   const t = useTheme();
-  const scale = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(0.5)).current;
+  const leftY = useRef(new Animated.Value(3)).current;
+  const rightY = useRef(new Animated.Value(-3)).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
         Animated.parallel([
-          Animated.timing(scale, { toValue: 1.14, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(opacity, { toValue: 0.9, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(leftY, { toValue: -3, duration: 1700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(rightY, { toValue: 3, duration: 1700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         ]),
         Animated.parallel([
-          Animated.timing(scale, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(opacity, { toValue: 0.5, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(leftY, { toValue: 3, duration: 1700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(rightY, { toValue: -3, duration: 1700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         ]),
       ])
     ).start();
   }, []);
 
   return (
-    <View style={{ width: 180, height: 180, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Outer breathing ring */}
+    <View style={{ width: 280, height: 164, alignItems: 'center', justifyContent: 'center' }}>
       <Animated.View style={{
-        position: 'absolute', width: 160, height: 160, borderRadius: 80,
-        borderWidth: 1, borderColor: t.amber + '60',
-        opacity, transform: [{ scale }],
-      }} />
-      {/* Inner ring */}
+        position: 'absolute', left: 6, top: 18,
+        width: 118, height: 78, borderRadius: 22,
+        borderWidth: 0.5, borderColor: t.amber + '50',
+        backgroundColor: t.amberSoft, padding: 15,
+        transform: [{ translateY: leftY }],
+      }}>
+        <MessageCircle size={20} color={t.amber} strokeWidth={2} />
+        <View style={{ width: 64, height: 3, borderRadius: 2, backgroundColor: t.amber + '55', marginTop: 12 }} />
+        <View style={{ width: 42, height: 3, borderRadius: 2, backgroundColor: t.amber + '30', marginTop: 6 }} />
+      </Animated.View>
+
       <Animated.View style={{
-        position: 'absolute', width: 130, height: 130, borderRadius: 65,
-        borderWidth: 0.5, borderColor: t.amber + '40',
-        opacity, transform: [{ scale }],
-      }} />
-      <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 28, color: t.amber }}>
-        be kind
-      </Text>
+        position: 'absolute', right: 6, bottom: 16,
+        width: 118, height: 78, borderRadius: 22,
+        borderWidth: 0.5, borderColor: t.coral + '50',
+        backgroundColor: t.coralSoft, padding: 15, alignItems: 'flex-end',
+        transform: [{ translateY: rightY }],
+      }}>
+        <MessageCircle size={20} color={t.coral} strokeWidth={2} />
+        <View style={{ width: 64, height: 3, borderRadius: 2, backgroundColor: t.coral + '55', marginTop: 12 }} />
+        <View style={{ width: 42, height: 3, borderRadius: 2, backgroundColor: t.coral + '30', marginTop: 6 }} />
+      </Animated.View>
+
+      <View style={{
+        width: 60, height: 60, borderRadius: 30,
+        backgroundColor: t.bg2, borderWidth: 1, borderColor: t.lineStrong,
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <HeartHandshake size={28} color={t.ink} strokeWidth={1.8} />
+      </View>
+    </View>
+  );
+}
+
+function KindnessRule({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
+  const t = useTheme();
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <View style={{
+        width: 36, height: 36, borderRadius: 12,
+        backgroundColor: t.bg3, alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon size={17} color={t.amber} strokeWidth={2} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: t.ink, fontSize: 13.5, fontWeight: '600' }}>{title}</Text>
+        <Text style={{ color: t.ink3, fontSize: 11.5, lineHeight: 16, marginTop: 2 }}>{body}</Text>
+      </View>
     </View>
   );
 }
@@ -153,27 +197,27 @@ export default function OnboardingScreen() {
   const steps = [
     {
       kicker: 'WELCOME',
-      before: "You're not ",
-      italic: 'alone.',
+      before: 'A real person,\n',
+      italic: 'right now.',
       accentColor: t.amber,
-      body: `talkd connects you with a real stranger, right now, for ${sessionMinutes} minutes. Real-time anonymous chat. Messages are not saved after the session.`,
-      cta: 'Ok',
+      body: `Talk about what matters with someone ready to listen. Every conversation is anonymous, real-time, and lasts ${sessionMinutes} minutes.`,
+      cta: 'Continue',
     },
     {
-      kicker: 'HOW IT WORKS',
-      before: 'Pick a ',
-      italic: 'topic.',
+      kicker: 'FIND YOUR ROOM',
+      before: 'Start with what\n',
+      italic: 'matters.',
       accentColor: t.coral,
-      body: 'Relationships, work decisions, mental health, late-night thoughts — or just chat. You both chose the same thing.',
-      cta: 'Got it',
+      body: 'Choose a topic, then decide whether you want to talk or listen. We will look for the right person for that moment.',
+      cta: 'Continue',
     },
     {
-      kicker: 'THE CONTRACT',
-      before: 'One rule: ',
+      kicker: 'OUR AGREEMENT',
+      before: 'One rule:\n',
       italic: 'be kind.',
-      accentColor: '#B5A8D9',
-      body: "No names, no photos, no contact info. Session metadata, reports, and ratings may be stored for safety and quality.",
-      cta: 'I understand',
+      accentColor: t.amber,
+      body: 'Behind every message is a real person. Listen without judgment, protect your privacy, and leave any conversation that feels wrong.',
+      cta: 'I agree and continue',
     },
   ];
 
@@ -191,6 +235,7 @@ export default function OnboardingScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        await markSafetyGuidelinesPending();
         router.replace('/auth' as never);
         return;
       }
@@ -206,64 +251,102 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-      {/* Progress bars */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 24, paddingTop: 16, gap: 6 }}>
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 24, paddingTop: 12, paddingBottom: 14,
+      }}>
+        <BrandMark compact />
+        <Text style={{ color: t.ink4, fontSize: 11.5, fontWeight: '600' }}>
+          {step + 1} of {steps.length}
+        </Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', paddingHorizontal: 24, gap: 6 }}>
         {steps.map((_, i) => (
           <View key={i} style={{
-            flex: 1, height: 2, borderRadius: 99,
+            flex: 1, height: 3, borderRadius: 2,
             backgroundColor: i <= step ? t.amber : t.bg3,
           }} />
         ))}
       </View>
 
-      {/* Animated visual */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
-        {step === 0 && <Visual1 />}
-        {step === 1 && <Visual2 />}
-        {step === 2 && <Visual3 />}
-      </View>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <View style={{
+          minHeight: isLast ? 184 : 224,
+          flex: 1, alignItems: 'center', justifyContent: 'center',
+          paddingHorizontal: 24, paddingVertical: 12,
+        }}>
+          {step === 0 && <Visual1 />}
+          {step === 1 && <Visual2 />}
+          {step === 2 && <Visual3 />}
+        </View>
 
-      {/* Content */}
-      <View style={{ paddingHorizontal: 28, paddingBottom: 24 }}>
-        <Text style={{ fontSize: 11, letterSpacing: 2.2, color: t.ink4, textTransform: 'uppercase', marginBottom: 14 }}>
-          {s.kicker}
-        </Text>
-        <Text style={{ fontFamily: 'Georgia', fontSize: 40, lineHeight: 44, letterSpacing: -0.8, color: t.ink }}>
-          {s.before}
-          <Text style={{ fontStyle: 'italic', color: s.accentColor }}>{s.italic}</Text>
-        </Text>
-        <Text style={{ fontSize: 14.5, color: t.ink3, marginTop: 14, lineHeight: 22, maxWidth: 320 }}>
-          {s.body}
-        </Text>
-        {!!acceptError && (
-          <Text style={{ fontSize: 12.5, color: t.red, marginTop: 12, lineHeight: 18 }}>
-            {acceptError}
+        <View style={{ paddingHorizontal: 28, paddingBottom: 28 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0, color: t.ink4, marginBottom: 12 }}>
+            {s.kicker}
           </Text>
-        )}
-      </View>
+          <Text style={{ fontFamily: 'Georgia', fontSize: 38, lineHeight: 42, letterSpacing: 0, color: t.ink }}>
+            {s.before}
+            <Text style={{ fontStyle: 'italic', color: s.accentColor }}>{s.italic}</Text>
+          </Text>
+          <Text style={{ fontSize: 14.5, color: t.ink3, marginTop: 14, lineHeight: 22, maxWidth: 330 }}>
+            {s.body}
+          </Text>
+          {isLast && (
+            <View style={{ gap: 12, marginTop: 18 }}>
+              <KindnessRule icon={HeartHandshake} title="Listen with care" body="No judgment, pressure, or cruelty." />
+              <KindnessRule icon={EyeOff} title="Keep it anonymous" body="No names, photos, or contact details." />
+              <KindnessRule icon={ShieldCheck} title="Put safety first" body="Leave and report anything that feels wrong." />
+            </View>
+          )}
+          {!!acceptError && (
+            <Text style={{ fontSize: 12.5, color: t.red, marginTop: 12, lineHeight: 18 }}>
+              {acceptError}
+            </Text>
+          )}
+        </View>
+      </ScrollView>
 
-      {/* CTAs */}
-      <View style={{ paddingHorizontal: 20, paddingBottom: 20, flexDirection: 'row', gap: 8 }}>
+      <View style={{
+        paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16,
+        flexDirection: 'row', gap: 8,
+        borderTopWidth: 0.5, borderTopColor: t.line,
+      }}>
         {step > 0 && (
           <TouchableOpacity
             onPress={() => setStep(step - 1)}
+            accessibilityRole="button"
+            accessibilityLabel="Previous onboarding step"
             style={{
-              paddingVertical: 15, paddingHorizontal: 24, borderRadius: 99,
+              width: 52, height: 52, borderRadius: 16,
               borderWidth: 0.5, borderColor: t.lineStrong,
+              alignItems: 'center', justifyContent: 'center',
             }}
+            activeOpacity={0.75}
           >
-            <Text style={{ fontSize: 14, color: t.ink2 }}>Back</Text>
+            <ArrowLeft size={20} color={t.ink2} strokeWidth={2} />
           </TouchableOpacity>
         )}
         <TouchableOpacity
           onPress={() => void handleNext()}
           disabled={accepting}
-          style={{ flex: 1, paddingVertical: 16, backgroundColor: accepting ? t.bg3 : t.amber, borderRadius: 99, alignItems: 'center' }}
+          accessibilityRole="button"
+          style={{
+            flex: 1, height: 52, backgroundColor: accepting ? t.bg3 : t.amber,
+            borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+            flexDirection: 'row', gap: 8,
+          }}
           activeOpacity={0.85}
         >
-          <Text style={{ fontSize: 15, fontWeight: '600', color: accepting ? t.ink4 : t.onAccent, letterSpacing: -0.1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: accepting ? t.ink4 : t.onAccent, letterSpacing: 0 }}>
             {accepting ? 'Saving...' : s.cta}
           </Text>
+          {!accepting && <ArrowRight size={18} color={t.onAccent} strokeWidth={2.2} />}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -1,8 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 
 type SafetyAcceptanceListener = (accepted: boolean) => void;
 
 const listeners = new Set<SafetyAcceptanceListener>();
+const PENDING_SAFETY_ACCEPTANCE_KEY = 'talkd:pending-safety-acceptance';
 
 interface SafetyProfileRow {
   safety_accepted_at: string | null;
@@ -38,6 +40,14 @@ export async function hasAcceptedSafetyGuidelines(): Promise<boolean> {
   return typeof profile?.safety_accepted_at === 'string';
 }
 
+export async function hasPendingSafetyAcceptance(): Promise<boolean> {
+  return await AsyncStorage.getItem(PENDING_SAFETY_ACCEPTANCE_KEY) === 'true';
+}
+
+export async function markSafetyGuidelinesPending(): Promise<void> {
+  await AsyncStorage.setItem(PENDING_SAFETY_ACCEPTANCE_KEY, 'true');
+}
+
 export async function markSafetyGuidelinesAccepted(): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
@@ -51,5 +61,6 @@ export async function markSafetyGuidelinesAccepted(): Promise<void> {
     throw new Error('Could not save safety acceptance.');
   }
 
+  await AsyncStorage.removeItem(PENDING_SAFETY_ACCEPTANCE_KEY);
   notifySafetyAcceptance(true);
 }

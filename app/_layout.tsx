@@ -3,11 +3,16 @@ import { StartupConfigurationError } from '@/components/StartupConfigurationErro
 import { Sentry, isSentryEnabled } from '@/lib/sentry';
 import { missingSupabaseConfig, supabase } from '@/lib/supabase';
 import { ensureOwnProfile } from '@/lib/profile';
-import { hasAcceptedSafetyGuidelines, subscribeSafetyAcceptance } from '@/lib/safetyAcceptance';
+import {
+  hasAcceptedSafetyGuidelines,
+  hasPendingSafetyAcceptance,
+  markSafetyGuidelinesAccepted,
+  subscribeSafetyAcceptance,
+} from '@/lib/safetyAcceptance';
 import { markPasswordRecoveryUrl, setPasswordRecoveryActive, subscribePasswordRecoveryActive } from '@/lib/passwordRecovery';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Linking, View } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 
@@ -17,19 +22,34 @@ function RootLayout() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [safetyAccepted, setSafetyAccepted] = useState<boolean | undefined>(undefined);
   const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
+  const activeUserId = useRef<string | null>(null);
+  const sessionUserId = session?.user.id;
 
   useEffect(() => {
+    function applySession(nextSession: Session | null) {
+      const nextUserId = nextSession?.user.id ?? null;
+      if (!nextSession) {
+        setSafetyAccepted(false);
+      } else if (activeUserId.current !== nextUserId) {
+        setSafetyAccepted(undefined);
+      }
+      activeUserId.current = nextUserId;
+      setSession(nextSession);
+    }
+
     supabase.auth.getSession()
-      .then(({ data: { session: s } }) => setSession(s))
+      .then(({ data: { session: s } }) => {
+        applySession(s);
+      })
       .catch((error: unknown) => {
         console.warn('Could not restore auth session', error);
         Sentry.captureException(error);
-        setSession(null);
+        applySession(null);
       });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       if (event === 'PASSWORD_RECOVERY') setPasswordRecoveryActive(true);
       if (event === 'SIGNED_OUT') setPasswordRecoveryActive(false);
-      setSession(s);
+      applySession(s);
     });
     const unsubscribeSafetyAcceptance = subscribeSafetyAcceptance(setSafetyAccepted);
     const unsubscribePasswordRecovery = subscribePasswordRecoveryActive(setPasswordRecoveryOpen);
@@ -54,8 +74,7 @@ function RootLayout() {
     let isCancelled = false;
 
     async function loadSafetyAcceptance() {
-      if (session === undefined) return;
-      if (!session) {
+      if (!sessionUserId) {
         setSafetyAccepted(false);
         return;
       }
@@ -63,7 +82,11 @@ function RootLayout() {
       setSafetyAccepted(undefined);
       try {
         await ensureOwnProfile();
-        const accepted = await hasAcceptedSafetyGuidelines();
+        let accepted = await hasAcceptedSafetyGuidelines();
+        if (!accepted && await hasPendingSafetyAcceptance()) {
+          await markSafetyGuidelinesAccepted();
+          accepted = true;
+        }
         if (!isCancelled) setSafetyAccepted(accepted);
       } catch (error: unknown) {
         console.warn('Could not prepare signed-in account', error);
@@ -77,7 +100,7 @@ function RootLayout() {
     return () => {
       isCancelled = true;
     };
-  }, [session]);
+  }, [sessionUserId]);
 
   useEffect(() => {
     if (session === undefined) return; // still loading
@@ -95,8 +118,8 @@ function RootLayout() {
     }
   }, [session, safetyAccepted, segments, passwordRecoveryOpen]);
 
-  // Avoid rendering screens before session is known
-  if (session === undefined) {
+  // Keep routing transitions invisible until auth and safety state agree.
+  if (session === undefined || (session && safetyAccepted === undefined)) {
     return <View style={{ flex: 1, backgroundColor: '#0E0D0C' }} />;
   }
 

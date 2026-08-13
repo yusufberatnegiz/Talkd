@@ -1,11 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  createElement,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { Platform } from 'react-native';
 import type { ExpoPurchaseError, ProductSubscription, Purchase } from 'expo-iap';
+import { setAccentChoice } from '@/hooks/useTheme';
 import { Sentry } from '@/lib/sentry';
 import { supabase } from '@/lib/supabase';
 import { PREMIUM_PLANS, type PremiumPlan } from '@/lib/premium';
 
-interface UsePremiumResult {
+export interface PremiumState {
   loading: boolean;
   actionLoading: boolean;
   isPurchaseAvailable: boolean;
@@ -18,25 +28,72 @@ interface UsePremiumResult {
   refresh: () => Promise<void>;
 }
 
-interface UsePremiumOptions {
-  enableStoreKit?: boolean;
-}
-
 const PREMIUM_PRODUCT_IDS = PREMIUM_PLANS.map(plan => plan.productId);
 const MISSING_NATIVE_IAP_MESSAGE = 'Premium purchases require an iOS development build or TestFlight build with StoreKit enabled.';
 const UNSUPPORTED_IAP_RUNTIME_MESSAGE = 'Premium purchases are available on iPhone through TestFlight or the App Store.';
 
 type ExpoIapModule = typeof import('expo-iap');
+const PremiumContext = createContext<PremiumState | null>(null);
 
-export function usePremium(options: UsePremiumOptions = {}): UsePremiumResult {
-  if (!options.enableStoreKit || !isAppleIapRuntimeSupported()) {
-    return useUnavailablePremium();
-  }
-
-  return useApplePremium();
+interface PremiumVerificationResult {
+  active?: unknown;
+  verified?: unknown;
 }
 
-function useUnavailablePremium(): UsePremiumResult {
+export function PremiumProvider({ children, enabled }: { children: ReactNode; enabled: boolean }) {
+  if (!enabled || !isAppleIapRuntimeSupported()) {
+    return createElement(UnavailablePremiumProvider, null, children);
+  }
+
+  let expoIapModule: ExpoIapModule;
+  try {
+    expoIapModule = loadExpoIap();
+  } catch (error: unknown) {
+    if (!isMissingNativeModuleError(error)) {
+      console.warn('Apple purchase module unavailable', error);
+      Sentry.captureException(error);
+    }
+    return createElement(UnavailablePremiumProvider, null, children);
+  }
+
+  return createElement(ApplePremiumProvider, { expoIapModule, children });
+}
+
+export function usePremium(): PremiumState {
+  const premium = useContext(PremiumContext);
+  if (!premium) {
+    throw new Error('usePremium must be used within PremiumProvider.');
+  }
+  return premium;
+}
+
+function UnavailablePremiumProvider({ children }: { children: ReactNode }) {
+  const value = useUnavailablePremium();
+  return createElement(PremiumContext.Provider, { value }, children);
+}
+
+function ApplePremiumProvider({
+  children,
+  expoIapModule,
+}: {
+  children: ReactNode;
+  expoIapModule: ExpoIapModule;
+}) {
+  const value = useApplePremium(expoIapModule);
+
+  useEffect(() => {
+    if (!value.loading && !value.isPremium) {
+      void setAccentChoice('classic').catch((error: unknown) => {
+        console.warn('Could not reset Premium accent', error);
+        Sentry.captureException(error);
+      });
+    }
+  }, [value.isPremium, value.loading]);
+
+  return createElement(PremiumContext.Provider, { value }, children);
+}
+
+function useUnavailablePremium(): PremiumState {
   const unavailableProduct = useCallback(() => null, []);
   const unavailableAction = useCallback(async () => false, []);
   const unavailableManage = useCallback(async () => undefined, []);
@@ -56,13 +113,14 @@ function useUnavailablePremium(): UsePremiumResult {
   };
 }
 
-function useApplePremium(): UsePremiumResult {
+function useApplePremium(expoIapModule: ExpoIapModule): PremiumState {
   const {
     deepLinkToSubscriptions,
+    getActiveSubscriptions: queryActiveSubscriptions,
     purchaseUpdatedListener,
     showManageSubscriptionsIOS,
     useIAP,
-  } = loadExpoIap();
+  } = expoIapModule;
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
@@ -70,12 +128,9 @@ function useApplePremium(): UsePremiumResult {
   const {
     connected,
     subscriptions,
-    activeSubscriptions,
     fetchProducts,
     finishTransaction,
-    getActiveSubscriptions,
     getAvailablePurchases,
-    hasActiveSubscriptions,
     requestPurchase,
     restorePurchases: restoreStorePurchases,
   } = useIAP({
@@ -96,6 +151,7 @@ function useApplePremium(): UsePremiumResult {
       setError('Your Apple subscription needs attention. Open Manage to update it.');
     },
   });
+  const [isPremium, setIsPremium] = useState(false);
 
   const productByPlan = useMemo(() => {
     return PREMIUM_PLANS.reduce<Record<PremiumPlan, ProductSubscription | null>>((next, plan) => {
@@ -107,11 +163,24 @@ function useApplePremium(): UsePremiumResult {
     });
   }, [subscriptions]);
 
-  const isPremium = useMemo(() => {
-    return activeSubscriptions.some(subscription =>
-      subscription.isActive && PREMIUM_PRODUCT_IDS.includes(subscription.productId)
+  const verifyPremiumEntitlement = useCallback(async (
+    transactionId?: string,
+  ): Promise<{ active: boolean; verified: boolean }> => {
+    const { data, error: verificationError } = await supabase.functions.invoke(
+      'verify-apple-purchase',
+      { body: transactionId ? { transactionId } : {} },
     );
-  }, [activeSubscriptions]);
+
+    if (verificationError) {
+      throw new Error('Talkd could not verify this Apple subscription.');
+    }
+
+    const result = data as PremiumVerificationResult | null;
+    const active = result?.active === true;
+    const verified = result?.verified === true;
+    setIsPremium(active);
+    return { active, verified };
+  }, []);
 
   const refresh = useCallback(async () => {
     if (Platform.OS !== 'ios') {
@@ -133,7 +202,11 @@ function useApplePremium(): UsePremiumResult {
     try {
       await fetchProducts({ skus: PREMIUM_PRODUCT_IDS, type: 'subs' });
       await getAvailablePurchases();
-      await getActiveSubscriptions(PREMIUM_PRODUCT_IDS);
+      const activeSubscriptions = await queryActiveSubscriptions(PREMIUM_PRODUCT_IDS);
+      const current = activeSubscriptions.find(subscription =>
+        subscription.isActive && PREMIUM_PRODUCT_IDS.includes(subscription.productId)
+      );
+      await verifyPremiumEntitlement(current?.transactionId);
     } catch (refreshError: unknown) {
       console.warn('Could not refresh Apple subscriptions', refreshError);
       Sentry.captureException(refreshError);
@@ -146,7 +219,7 @@ function useApplePremium(): UsePremiumResult {
     } finally {
       setLoading(false);
     }
-  }, [connected, fetchProducts, getActiveSubscriptions, getAvailablePurchases, nativeIapAvailable]);
+  }, [connected, fetchProducts, getAvailablePurchases, nativeIapAvailable, queryActiveSubscriptions, verifyPremiumEntitlement]);
 
   useEffect(() => {
     void refresh();
@@ -156,13 +229,14 @@ function useApplePremium(): UsePremiumResult {
     let hasPremiumPurchase = false;
     for (const purchase of purchases) {
       if (!PREMIUM_PRODUCT_IDS.includes(purchase.productId)) continue;
-      hasPremiumPurchase = true;
+      const verification = await verifyPremiumEntitlement(purchase.transactionId ?? undefined);
+      if (!verification.verified) continue;
+      hasPremiumPurchase = hasPremiumPurchase || verification.active;
       await finishTransaction({ purchase, isConsumable: false });
     }
     await getAvailablePurchases();
-    await getActiveSubscriptions(PREMIUM_PRODUCT_IDS);
     return hasPremiumPurchase;
-  }, [finishTransaction, getActiveSubscriptions, getAvailablePurchases]);
+  }, [finishTransaction, getAvailablePurchases, verifyPremiumEntitlement]);
 
   useEffect(() => {
     if (Platform.OS !== 'ios' || !nativeIapAvailable) return undefined;
@@ -263,8 +337,12 @@ function useApplePremium(): UsePremiumResult {
     try {
       await restoreStorePurchases();
       await getAvailablePurchases();
-      await getActiveSubscriptions(PREMIUM_PRODUCT_IDS);
-      return hasActiveSubscriptions(PREMIUM_PRODUCT_IDS);
+      const activeSubscriptions = await queryActiveSubscriptions(PREMIUM_PRODUCT_IDS);
+      const current = activeSubscriptions.find(subscription =>
+        subscription.isActive && PREMIUM_PRODUCT_IDS.includes(subscription.productId)
+      );
+      const verification = await verifyPremiumEntitlement(current?.transactionId);
+      return verification.active;
     } catch (restoreError: unknown) {
       console.warn('Could not restore Apple purchases', restoreError);
       Sentry.captureException(restoreError);
@@ -278,7 +356,7 @@ function useApplePremium(): UsePremiumResult {
     } finally {
       setActionLoading(false);
     }
-  }, [getActiveSubscriptions, getAvailablePurchases, hasActiveSubscriptions, nativeIapAvailable, restoreStorePurchases]);
+  }, [getAvailablePurchases, nativeIapAvailable, queryActiveSubscriptions, restoreStorePurchases, verifyPremiumEntitlement]);
 
   const openManageSubscriptions = useCallback(async (): Promise<void> => {
     setActionLoading(true);

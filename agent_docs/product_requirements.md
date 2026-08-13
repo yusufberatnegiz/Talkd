@@ -78,9 +78,9 @@ Matching priority:
 2. Same topic + Talker <-> Talker fallback
 3. Never: Listener <-> Listener
 
-Prototype status:
-- Realtime broadcast matching exists.
-- This is acceptable for prototype testing only.
+Current status:
+- Final matching decisions run through a server-authoritative Supabase RPC.
+- Supabase Realtime is used for ephemeral session communication, not match decisions.
 
 Production requirement:
 - Matchmaking should become server-authoritative through Supabase database RPC or Edge Function.
@@ -88,16 +88,16 @@ Production requirement:
 
 Acceptance Criteria:
 - [x] Current 6-topic UI exists
-- [x] Prototype match via Supabase Realtime broadcast channels
-- [x] 90s async fallback UI triggers
+- [x] Server-authoritative match RPC
+- [x] 90s no-match fallback UI triggers
 - [x] Matching screen shows wait state
 - [x] Correct role pairing for Talker/Listener flow
-- [ ] Production-safe server-authoritative match queue
-- [ ] No self-match
-- [ ] No duplicate queue rows per user
-- [ ] No duplicate matches
-- [ ] Cancel queue works reliably
-- [ ] Banned/cooldown users cannot enter matchmaking
+- [x] Production-safe server-authoritative match queue
+- [x] No self-match
+- [x] No duplicate queue rows per user
+- [x] No duplicate active matches
+- [x] Cancel queue works reliably
+- [x] Banned/cooldown users cannot enter matchmaking
 
 ---
 
@@ -176,20 +176,21 @@ Acceptance Criteria:
 
 ---
 
-## F06 - Async Fallback
+## F06 - No-Match Fallback
 
 - Triggers after the current 90s match timeout.
-- User can leave an async note.
-- Push notification on response is TODO.
-- Expiry is 24 hours when async persistence is implemented.
+- Offers honest retry and return-home actions.
+- Does not save or imply that it sends an async note.
 
 Current status:
-- Async fallback UI exists.
-- Async persistence is not complete unless explicitly implemented.
+- No-match fallback UI exists.
+- Async notes are deferred until safe persistence, expiry, deletion, and push delivery are implemented together.
 
 Acceptance Criteria:
 - [x] Fallback at 90s
-- [x] Async note UI exists
+- [x] Retry matching action
+- [x] Return-home action
+- [x] No unsaved-note promise
 - [ ] Async note is persisted safely
 - [ ] Async note expires after 24h
 - [ ] Push on response
@@ -289,7 +290,6 @@ Acceptance Criteria:
 - Group chat
 - Media sharing
 - Web version
-- Payments/subscriptions
 - Voice/video
 - More topics unless explicitly requested
 - Turkish localization
@@ -301,11 +301,13 @@ Premium must not gate safety, anonymity, reporting, moderation, or basic listene
 
 Features:
 - Talk anytime without the free listen-back requirement
-- Priority matching
 - Preferred listener matching using anonymous rating aggregates
 - One +15 minute chat extension when both people agree
-- Instant translation
 - Custom theme colors
+
+Post-release candidates, not included in the current paywall:
+- General queue priority
+- Instant translation
 
 Acceptance Criteria:
 - [x] Premium purchase flow uses direct Apple StoreKit through `expo-iap`

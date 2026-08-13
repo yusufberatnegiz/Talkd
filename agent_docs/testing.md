@@ -89,7 +89,7 @@ Expected:
 - [ ] Talker + Listener -> correct roles assigned
 - [ ] Talker + Talker fallback works when selected/allowed
 - [ ] Listener + Listener never matches
-- [ ] Wait 90s -> async fallback screen appears
+- [ ] Wait 90s -> no-match fallback screen appears
 - [ ] Matching screen shows wait state
 - [ ] Cancel/back removes queue entry
 - [ ] User cannot match with self
@@ -142,15 +142,13 @@ Expected:
 
 ---
 
-### After F06 - Async Fallback
+### After F06 - No-Match Fallback
 
 - [ ] Fallback at 90s
-- [ ] Submit async note
-- [ ] Async note persists only if persistence is implemented
-- [ ] Async note expires after 24h when persistence is implemented
-- [ ] User can cancel/delete async note if supported
-- [ ] Push notification on response (TODO)
-- [ ] Async note does not create false “messages are never stored” contradiction in copy
+- [ ] Keep looking starts a fresh match attempt
+- [ ] Go home removes the queue row and returns home
+- [ ] Screen clearly says nothing was sent or saved
+- [ ] No async note controls appear until persistence is implemented
 
 ---
 

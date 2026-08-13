@@ -4,8 +4,10 @@ import { PREMIUM_ENTITLEMENT_LABEL, PREMIUM_FEATURES, PREMIUM_PLANS, type Premiu
 import { useRouter } from 'expo-router';
 import { ArrowLeft, BadgeCheck, Crown, RefreshCw, ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const APPLE_STANDARD_EULA_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 export default function PremiumScreen() {
   const t = useTheme();
@@ -20,7 +22,7 @@ export default function PremiumScreen() {
     purchasePlan,
     restorePurchases,
     openManageSubscriptions,
-  } = usePremium({ enableStoreKit: true });
+  } = usePremium();
   const [selectedPlan, setSelectedPlan] = useState<PremiumPlan>('monthly');
   const selectedProduct = getPlanProduct(selectedPlan);
   const canPurchaseSelectedPlan = isPurchaseAvailable && !!selectedProduct;
@@ -129,7 +131,7 @@ export default function PremiumScreen() {
               {PREMIUM_PLANS.map(plan => {
                 const selected = selectedPlan === plan.key;
                 const product = getPlanProduct(plan.key);
-                const price = product?.displayPrice ?? plan.price;
+                const price = product?.displayPrice ?? 'Unavailable';
                 return (
                   <TouchableOpacity
                     key={plan.key}
@@ -170,21 +172,11 @@ export default function PremiumScreen() {
                         </Text>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{
-                          fontSize: 12,
-                          color: t.ink4,
-                          textDecorationLine: 'line-through',
-                        }}>
-                          {plan.compareAtPrice}
-                        </Text>
-                        <Text style={{ marginTop: 2, fontSize: 16, fontWeight: '700', color: t.amber }}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: product ? t.amber : t.ink4 }}>
                           {price}
                         </Text>
                       </View>
                     </View>
-                    <Text style={{ marginTop: 8, fontSize: 11.5, lineHeight: 16, color: t.ink4 }}>
-                      Launch price, limited time.
-                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -278,6 +270,18 @@ export default function PremiumScreen() {
             </View>
           </>
         )}
+
+        <Text style={{ marginTop: 22, textAlign: 'center', fontSize: 11.5, lineHeight: 17, color: t.ink4 }}>
+          Payment is charged to your Apple ID. Your subscription renews automatically unless canceled at least 24 hours before the current period ends. Manage or cancel it in your App Store account settings.
+        </Text>
+        <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'center', gap: 22 }}>
+          <TouchableOpacity onPress={() => void Linking.openURL(APPLE_STANDARD_EULA_URL)}>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: t.ink3 }}>Terms of Use</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/privacy')}>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: t.ink3 }}>Privacy</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,5 +1,6 @@
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import { StartupConfigurationError } from '@/components/StartupConfigurationError';
+import { PremiumProvider } from '@/hooks/usePremium';
 import { Sentry, isSentryEnabled } from '@/lib/sentry';
 import { missingSupabaseConfig, supabase } from '@/lib/supabase';
 import { ensureOwnProfile } from '@/lib/profile';
@@ -124,7 +125,7 @@ function RootLayout() {
   }
 
   return (
-    <>
+    <PremiumProvider enabled={session !== null}>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
@@ -138,7 +139,7 @@ function RootLayout() {
         <Stack.Screen name="premium" />
         <Stack.Screen name="rating" />
       </Stack>
-    </>
+    </PremiumProvider>
   );
 }
 

@@ -1,12 +1,11 @@
 import { TopicIcon } from '@/components/TopicIcon';
 import { MATCH_TIMEOUT_MS } from '@/constants/config';
 import { getTopic } from '@/constants/topics';
-import { usePremium } from '@/hooks/usePremium';
 import { useTheme } from '@/hooks/useTheme';
 import { cancelMatchQueue, findOrCreateMatch } from '@/lib/matching';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 function RingSet({ hue, running }: { hue: string; running: boolean }) {
@@ -61,99 +60,37 @@ function RingSet({ hue, running }: { hue: string; running: boolean }) {
 function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: string; onBack: () => void }) {
   const t = useTheme();
   const router = useRouter();
-  const [note, setNote] = useState(specific);
-  const [unavailable, setUnavailable] = useState(false);
-
-  if (unavailable) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
-          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: hue, marginBottom: 28 }} />
-          <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 32, lineHeight: 38, letterSpacing: -0.3, color: t.ink, textAlign: 'center' }}>
-            Async notes are not ready yet.
-          </Text>
-          <Text style={{ fontSize: 13.5, color: t.ink3, marginTop: 14, lineHeight: 20, textAlign: 'center', maxWidth: 280 }}>
-            We did not send or save this note. You can keep looking now, or come back later.
-          </Text>
-          <View style={{
-            marginTop: 30,
-            padding: 16,
-            backgroundColor: t.bg2,
-            borderWidth: 0.5,
-            borderColor: t.line,
-            borderRadius: 16,
-            maxWidth: 300,
-          }}>
-          <Text style={{ fontSize: 13.5, fontWeight: '500', color: t.ink2 }}>
-            &quot;{note || 'Someone wanted to talk.'}&quot;
-          </Text>
-          </View>
-          <TouchableOpacity
-            onPress={onBack}
-            style={{ marginTop: 32, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 99, backgroundColor: hue }}
-            activeOpacity={0.85}
-          >
-            <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.onAccent }}>Keep looking</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.replace('/(tabs)')}
-            style={{ marginTop: 12, paddingVertical: 14, paddingHorizontal: 32 }}
-            activeOpacity={0.85}
-          >
-            <Text style={{ fontSize: 14.5, fontWeight: '500', color: t.ink3 }}>Go home</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-      <TouchableOpacity onPress={onBack} style={{ paddingHorizontal: 24, paddingTop: 12 }}>
-        <Text style={{ fontSize: 13, color: t.ink3 }}>Back to matching</Text>
-      </TouchableOpacity>
-      <View style={{ paddingHorizontal: 28, paddingTop: 28, paddingBottom: 20 }}>
-        <Text style={{ fontSize: 11, letterSpacing: 2.2, color: t.ink4, textTransform: 'uppercase', marginBottom: 14 }}>
-          ASYNC FALLBACK
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36 }}>
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: hue, marginBottom: 28 }} />
+        <Text style={{ fontFamily: 'Georgia', fontStyle: 'italic', fontSize: 34, lineHeight: 40, color: t.ink, textAlign: 'center' }}>
+          Quiet right now.
         </Text>
-        <Text style={{ fontFamily: 'Georgia', fontSize: 34, lineHeight: 40, letterSpacing: -0.6, color: t.ink }}>
-          Quiet right now.{'\n'}
-          <Text style={{ fontStyle: 'italic', color: hue }}>Leave a note?</Text>
+        <Text style={{ fontSize: 13.5, color: t.ink3, marginTop: 14, lineHeight: 20, textAlign: 'center', maxWidth: 290 }}>
+          We couldn&apos;t find a compatible person this time. Nothing was sent or saved.
         </Text>
-        <Text style={{ fontSize: 13, color: t.ink3, marginTop: 10, lineHeight: 19 }}>
-          Write what&apos;s on your mind. When someone good comes online, we&apos;ll connect you both.
-        </Text>
-      </View>
-      <View style={{ flex: 1, paddingHorizontal: 20 }}>
-        <TextInput
-          value={note}
-          onChangeText={setNote}
-          placeholder="what's going on..."
-          placeholderTextColor={t.ink4}
-          multiline
-          style={{
-            flex: 1,
-            padding: 18,
-            borderRadius: 20,
-            backgroundColor: t.bg2,
-            borderWidth: 0.5,
-            borderColor: t.line,
-            color: t.ink,
-            fontSize: 17,
-            lineHeight: 24,
-            textAlignVertical: 'top',
-          }}
-        />
-      </View>
-      <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}>
+        {!!specific && (
+          <View style={{ marginTop: 24, padding: 14, borderRadius: 8, backgroundColor: t.bg2, borderWidth: 0.5, borderColor: t.line, maxWidth: 300 }}>
+            <Text numberOfLines={3} style={{ fontSize: 13, lineHeight: 19, color: t.ink2 }}>
+              &quot;{specific}&quot;
+            </Text>
+          </View>
+        )}
         <TouchableOpacity
-          disabled={!note.trim()}
-          onPress={() => setUnavailable(true)}
-          style={{ paddingVertical: 16, borderRadius: 99, alignItems: 'center', backgroundColor: note.trim() ? hue : t.bg3 }}
+          onPress={onBack}
+          style={{ marginTop: 30, minWidth: 180, paddingVertical: 15, borderRadius: 99, alignItems: 'center', backgroundColor: hue }}
+          activeOpacity={0.85}
         >
-          <Text style={{ fontSize: 15, fontWeight: '600', color: note.trim() ? t.onAccent : t.ink4 }}>
-            Check async availability
-          </Text>
+          <Text style={{ fontSize: 14.5, fontWeight: '600', color: t.onAccent }}>Keep looking</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.replace('/(tabs)')}
+          style={{ marginTop: 10, paddingVertical: 14, paddingHorizontal: 32 }}
+          activeOpacity={0.85}
+        >
+          <Text style={{ fontSize: 14, fontWeight: '500', color: t.ink3 }}>Go home</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -163,7 +100,6 @@ function FallbackScreen({ hue, specific, onBack }: { hue: string; specific: stri
 export default function MatchScreen() {
   const t = useTheme();
   const router = useRouter();
-  const { isPremium } = usePremium();
   const { topic: topicParam, intent: intentParam, specific: specificParam } = useLocalSearchParams<{
     topic: string;
     intent: string;
@@ -223,8 +159,6 @@ export default function MatchScreen() {
           intent,
           role: 'talker',
           allowTalkerFallback: queueType === 'talker',
-          preferHelpfulListeners: isPremium,
-          skipListenBackGate: isPremium,
         });
 
         if (isCancelled || matchedRef.current || !result.matched) return;
@@ -275,7 +209,7 @@ export default function MatchScreen() {
       if (pollTimer) clearInterval(pollTimer);
       if (!matchedRef.current) void cancelMatchQueue();
     };
-  }, [fallback, showOptions, queueType, pollKey, tp.key, specific, intent, isPremium]);
+  }, [fallback, showOptions, queueType, pollKey, tp.key, specific, intent]);
 
   async function handleCancel() {
     if (cancellingRef.current) return;
